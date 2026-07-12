@@ -1,13 +1,13 @@
-from config import DB_PATH
-from database import create_tables
+import sqlite3
 
+DART_DB_PATH = "data/dart.db"
 
-def main() -> None:
-    create_tables()
+conn = sqlite3.connect(DART_DB_PATH)
+cursor = conn.cursor()
 
-    print("OpenDART 데이터베이스 초기화 완료")
-    print(f"DB 경로: {DB_PATH}")
+cursor.execute("SELECT COUNT(*) dart_corporations")
+count = cursor.fetchone()[0]
 
+conn.close()
 
-if __name__ == "__main__":
-    main()
+print("남은 기업 수:", count)
