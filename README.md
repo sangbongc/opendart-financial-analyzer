@@ -1,1 +1,1 @@
-# DART-reader-with-open-API
+# opendart-financial-analyzer
