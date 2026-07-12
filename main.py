@@ -1,13 +1,34 @@
-import sqlite3
+from dart.corporation_service import (
+    CorporationSyncError,
+    sync_corporations,
+)
+from database.schema import create_tables
 
-DART_DB_PATH = "data/dart.db"
 
-conn = sqlite3.connect(DART_DB_PATH)
-cursor = conn.cursor()
+def main() -> None:
+    print("DART 기업 고유번호 동기화를 시작합니다.")
 
-cursor.execute("SELECT COUNT(*) dart_corporations")
-count = cursor.fetchone()[0]
+    create_tables()
 
-conn.close()
+    try:
+        result = sync_corporations()
 
-print("남은 기업 수:", count)
+    except CorporationSyncError as error:
+        print(f"동기화 실패: {error}")
+        return
+
+    except Exception as error:
+        print(f"예상하지 못한 오류가 발생했습니다: {error}")
+        return
+
+    print("\n동기화 완료")
+    print(f"수신 기업 수: {result['received_count']:,}")
+    print(f"저장 또는 갱신: {result['saved_count']:,}")
+    print(f"종목코드 보유 기업: {result['listed_count']:,}")
+    print(f"종목코드 미보유 기업: {result['unlisted_count']:,}")
+    print(f"비활성화된 기업: {result['deactivated_count']:,}")
+    print(f"동기화 시각: {result['synced_at']}")
+
+
+if __name__ == "__main__":
+    main()

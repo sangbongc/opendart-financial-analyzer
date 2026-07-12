@@ -46,3 +46,30 @@ class DartClient:
             )
 
         return data
+
+    def get_binary(
+        self,
+        endpoint: str,
+        params: dict | None = None,
+    ) -> bytes:
+        """
+        ZIP 파일처럼 JSON이 아닌 바이너리 응답을 내려받는다.
+        """
+        request_params = dict(params or {})
+        request_params["crtfc_key"] = CRTFC_KEY
+
+        response = requests.get(
+            BASE_URL + endpoint,
+            params=request_params,
+            timeout=TIMEOUT,
+        )
+
+        response.raise_for_status()
+
+        if not response.content:
+            raise DartAPIError(
+                status="EMPTY_RESPONSE",
+                message="OpenDART 응답 내용이 비어 있습니다.",
+            )
+
+        return response.content
