@@ -1,19 +1,13 @@
-from dart.client import DartAPIError, DartClient
+from config import DB_PATH
+from database import create_tables
 
 
-client = DartClient()
+def main() -> None:
+    create_tables()
 
-try:
-    result = client.get(
-        "/company.json",
-        {
-            "corp_code": "00126380",
-        },
-    )
+    print("OpenDART 데이터베이스 초기화 완료")
+    print(f"DB 경로: {DB_PATH}")
 
-    print("회사명:", result["corp_name"])
-    print("종목코드:", result["stock_code"])
-    print("대표자:", result["ceo_nm"])
 
-except DartAPIError as error:
-    print(error)
+if __name__ == "__main__":
+    main()

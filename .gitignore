@@ -13,3 +13,7 @@ venv/
 *.log
 
 .idea/
+
+data/*.db
+data/*.sqlite
+data/*.sqlite3
