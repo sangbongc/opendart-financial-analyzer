@@ -32,9 +32,101 @@ def create_corporations_table() -> None:
     finally:
         connection.close()
 
+def create_financial_statement_tables(
+    connection: sqlite3.Connection,
+) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS financial_statements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            rcept_no TEXT NOT NULL,
+            reprt_code TEXT NOT NULL,
+            bsns_year TEXT NOT NULL,
+            corp_code TEXT NOT NULL,
+
+            fs_div TEXT NOT NULL,
+            fs_nm TEXT,
+
+            sj_div TEXT NOT NULL,
+            sj_nm TEXT,
+
+            account_id TEXT NOT NULL DEFAULT '',
+            account_nm TEXT NOT NULL,
+            account_detail TEXT NOT NULL DEFAULT '',
+
+            thstrm_nm TEXT,
+            thstrm_amount INTEGER,
+            thstrm_add_amount INTEGER,
+
+            frmtrm_nm TEXT,
+            frmtrm_amount INTEGER,
+            frmtrm_q_nm TEXT,
+            frmtrm_q_amount INTEGER,
+            frmtrm_add_amount INTEGER,
+
+            bfefrmtrm_nm TEXT,
+            bfefrmtrm_amount INTEGER,
+
+            ord INTEGER,
+            currency TEXT,
+
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (corp_code)
+                REFERENCES corp_codes(corp_code),
+
+            UNIQUE (
+                rcept_no,
+                fs_div,
+                sj_div,
+                account_id,
+                account_nm,
+                account_detail,
+                ord
+            )
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_financial_statements_corp_year
+        ON financial_statements(
+            corp_code,
+            bsns_year
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_financial_statements_report
+        ON financial_statements(
+            corp_code,
+            bsns_year,
+            reprt_code,
+            fs_div
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_financial_statements_account
+        ON financial_statements(
+            corp_code,
+            account_id
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_financial_statements_account_name
+        ON financial_statements(
+            corp_code,
+            account_nm
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_financial_statements_receipt
+        ON financial_statements(rcept_no);
+        """
+    )
+
 
 def create_tables() -> None:
-    """
-    프로젝트에서 사용하는 모든 테이블을 생성한다.
-    """
-    create_corporations_table()
+    connection = get_connection()
+
+    try:
+        create_corporations_table()
+        create_financial_statement_tables(connection)
+        connection.commit()
+
+    finally:
+        connection.close()
