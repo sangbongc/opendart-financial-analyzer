@@ -125,7 +125,7 @@ def save_financial_statements(
         connection.close()
 
 
-def fetch_financial_statements(
+def fetch_financial_statements_from_db(
     corp_code: str,
     bsns_year: str | None = None,
     reprt_code: str | None = None,

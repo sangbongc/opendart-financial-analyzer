@@ -128,7 +128,7 @@ def test_save_financial_statements(
 
     stored_rows = (
         financial_statement_repository
-        .fetch_financial_statements(
+        .fetch_financial_statements_from_db(
             corp_code="00126380",
             bsns_year="2025",
             reprt_code="11011",
@@ -207,7 +207,7 @@ def test_account_id_and_detail_none_are_saved_as_empty_string(
 
     stored_rows = (
         financial_statement_repository
-        .fetch_financial_statements(
+        .fetch_financial_statements_from_db(
             corp_code="00126380",
         )
     )
@@ -256,7 +256,7 @@ def test_fetch_financial_statements_with_filters(
 
     matched_rows = (
         financial_statement_repository
-        .fetch_financial_statements(
+        .fetch_financial_statements_from_db(
             corp_code="00126380",
             bsns_year="2025",
             reprt_code="11011",
@@ -266,7 +266,7 @@ def test_fetch_financial_statements_with_filters(
 
     unmatched_rows = (
         financial_statement_repository
-        .fetch_financial_statements(
+        .fetch_financial_statements_from_db(
             corp_code="00126380",
             bsns_year="2024",
         )

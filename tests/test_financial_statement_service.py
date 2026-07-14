@@ -2,7 +2,7 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 from dart.financial_statement_service import (
-    fetch_financial_statements,
+    fetch_financial_statements_from_dart,
 )
 
 
@@ -27,7 +27,7 @@ def test_fetch_financial_statements(
         }
     ]
 
-    result = fetch_financial_statements(
+    result = fetch_financial_statements_from_dart(
         corp_code="00126380",
         bsns_year="2025",
     )

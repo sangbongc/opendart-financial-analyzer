@@ -10,7 +10,7 @@ DEFAULT_REPORT_CODE = "11011"
 DEFAULT_FS_DIV = "CFS"
 
 
-def fetch_financial_statements(
+def fetch_financial_statements_from_dart(
     corp_code: str,
     bsns_year: str,
     reprt_code: str = DEFAULT_REPORT_CODE,
