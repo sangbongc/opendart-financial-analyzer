@@ -100,7 +100,7 @@ def create_financial_statement_tables(
             currency TEXT,
 
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            
 
             FOREIGN KEY (corp_code)
                 REFERENCES dart_corporations(corp_code),
