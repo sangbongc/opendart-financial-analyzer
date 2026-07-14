@@ -7,6 +7,9 @@ from dart.client import DartClient
 from database.corporation_repository import (
     deactivate_missing_corporations,
     upsert_corporations,
+    search_corporations_by_name,
+    fetch_corporation_by_corp_code,
+    fetch_corporation_by_stock_code,
 )
 
 
@@ -157,3 +160,67 @@ def sync_corporations(
         "deactivated_count": deactivated_count,
         "synced_at": sync_time,
     }
+def _is_stock_code(value: str) -> bool:
+    """
+    입력값이 6자리 주식 종목코드 형식인지 확인한다.
+    """
+    return len(value) == 6 and value.isdigit()
+
+
+def _is_corp_code(value: str) -> bool:
+    """
+    입력값이 8자리 DART 기업 고유번호 형식인지 확인한다.
+    """
+    return len(value) == 8 and value.isdigit()
+
+
+def find_corporations(
+    query: str,
+    active_only: bool = True,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    종목코드, DART 기업 고유번호 또는 기업명으로 기업을 찾는다.
+
+    - 숫자 6자리: 주식 종목코드로 조회
+    - 숫자 8자리: DART 기업 고유번호로 조회
+    - 그 외 입력: 기업명 부분 검색
+
+    반환 형식을 일관되게 유지하기 위해 항상 목록을 반환한다.
+    """
+    normalized_query = query.strip()
+
+    if not normalized_query:
+        raise ValueError(
+            "기업 검색어는 비어 있을 수 없습니다."
+        )
+
+    if _is_stock_code(normalized_query):
+        corporation = fetch_corporation_by_stock_code(
+            stock_code=normalized_query,
+            active_only=active_only,
+        )
+
+        if corporation is None:
+            return []
+
+        return [corporation]
+
+    if _is_corp_code(normalized_query):
+        corporation = fetch_corporation_by_corp_code(
+            corp_code=normalized_query,
+        )
+
+        if corporation is None:
+            return []
+
+        if active_only and not corporation["is_active"]:
+            return []
+
+        return [corporation]
+
+    return search_corporations_by_name(
+        keyword=normalized_query,
+        active_only=active_only,
+        limit=limit,
+    )

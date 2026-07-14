@@ -315,3 +315,87 @@ def fetch_all_corporations(
 
     finally:
         connection.close()
+    
+def search_corporations_by_name(
+    keyword: str,
+    active_only: bool = True,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    기업명에 검색어가 포함된 기업 목록을 조회한다.
+
+    검색어와 기업명이 정확히 일치하는 결과를 먼저 반환하고,
+    나머지는 기업명 오름차순으로 정렬한다.
+    """
+    normalized_keyword = keyword.strip()
+
+    if not normalized_keyword:
+        raise ValueError(
+            "기업명 검색어는 비어 있을 수 없습니다."
+        )
+
+    if not isinstance(limit, int):
+        raise TypeError(
+            "limit은 정수여야 합니다."
+        )
+
+    if limit <= 0:
+        raise ValueError(
+            "limit은 1 이상이어야 합니다."
+        )
+
+    connection = get_connection()
+
+    try:
+        query = """
+            SELECT
+                corp_code,
+                corp_name,
+                stock_code,
+                modify_date,
+                is_active,
+                first_seen_at,
+                last_seen_at,
+                deactivated_at
+            FROM dart_corporations
+            WHERE corp_name LIKE ?
+        """
+
+        parameters: list = [
+            f"%{normalized_keyword}%",
+        ]
+
+        if active_only:
+            query += """
+                AND is_active = 1
+            """
+
+        query += """
+            ORDER BY
+                CASE
+                    WHEN corp_name = ? THEN 0
+                    ELSE 1
+                END,
+                corp_name
+            LIMIT ?
+        """
+
+        parameters.extend(
+            [
+                normalized_keyword,
+                limit,
+            ]
+        )
+
+        rows = connection.execute(
+            query,
+            parameters,
+        ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+        connection.close()
