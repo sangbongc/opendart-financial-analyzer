@@ -34,7 +34,7 @@ def test_fetch_financial_statements(
     )
 
     client.get.assert_called_once_with(
-        "fnlttSinglAcntAll.json",
+        "/fnlttSinglAcntAll.json",
         {
             "corp_code": "00126380",
             "bsns_year": "2025",
@@ -48,6 +48,7 @@ def test_fetch_financial_statements(
     assert result == [
         {
             "account_nm": "매출액",
+            "fs_div": "CFS",
         }
     ]
 
@@ -121,7 +122,7 @@ def test_fetch_financial_statements_from_dart(
     assert result == PARSED_FINANCIAL_STATEMENTS
 
     mock_client.get.assert_called_once_with(
-        "fnlttSinglAcntAll.json",
+        "/fnlttSinglAcntAll.json",
         {
             "corp_code": "00126380",
             "bsns_year": "2025",
@@ -254,3 +255,37 @@ def test_sync_financial_statements_handles_empty_response(
     }
 
     mock_save.assert_called_once_with([])
+
+@patch(
+    "dart.financial_statement_service."
+    "parse_financial_statement_response"
+)
+def test_fetch_financial_statements_adds_fs_div(
+    mock_parse: Mock,
+):
+    mock_client = Mock()
+    mock_client.get.return_value = {
+        "status": "000",
+        "message": "정상",
+        "list": [],
+    }
+
+    parsed_row = {
+        "rcept_no": "20260317001234",
+        "reprt_code": "11011",
+        "bsns_year": "2025",
+        "corp_code": "00126380",
+        "sj_div": "BS",
+        "account_nm": "자산총계",
+    }
+
+    mock_parse.return_value = [parsed_row]
+
+    result = fetch_financial_statements_from_dart(
+        corp_code="00126380",
+        bsns_year="2025",
+        fs_div="CFS",
+        client=mock_client,
+    )
+
+    assert result[0]["fs_div"] == "CFS"

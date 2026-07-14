@@ -46,7 +46,7 @@ def fetch_financial_statements_from_dart(
     dart_client = client or DartClient()
 
     response = dart_client.get(
-        "fnlttSinglAcntAll.json",
+        "/fnlttSinglAcntAll.json",
         {
             "corp_code": corp_code,
             "bsns_year": bsns_year,
@@ -55,9 +55,14 @@ def fetch_financial_statements_from_dart(
         },
     )
 
-    return parse_financial_statement_response(
-        response
-        )
+    financial_statements = (
+        parse_financial_statement_response(response)
+    )
+
+    for financial_statement in financial_statements:
+        financial_statement["fs_div"] = fs_div
+
+    return financial_statements
 
 
 def sync_financial_statements(
