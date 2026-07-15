@@ -6,6 +6,11 @@ from dart.financial_statement_service import (
 from database.financial_statement_repository import (
     fetch_financial_statements_from_db,
 )
+from analysis.financial_ratio_service import (
+    FinancialRatioCalculationError,
+    calculate_financial_ratios,
+)
+
 from wcwidth import wcswidth
 
 def truncate_text(
@@ -101,6 +106,37 @@ def print_financial_statements(
             f"{amount:>25}"
         )
 
+def format_ratio(value: float | None) -> str:
+    if value is None:
+        return "계산 불가"
+
+    return f"{value:,.2f}%"
+
+def print_financial_ratios(
+    result: dict,
+) -> None:
+    ratios = result["ratios"]
+
+    ratio_names = {
+        "operating_margin": "영업이익률",
+        "net_profit_margin": "순이익률",
+        "roa": "ROA",
+        "roe": "ROE",
+        "debt_ratio": "부채비율",
+        "current_ratio": "유동비율",
+    }
+
+    print()
+    print("[주요 재무비율]")
+    print("-" * 40)
+
+    for key, name in ratio_names.items():
+        print(
+            f"{pad(name, 20)}"
+            f"{format_ratio(ratios[key]):>15}"
+        )
+
+
 
 def main() -> None:
     create_tables()
@@ -115,6 +151,18 @@ def main() -> None:
     # print(f"저장 행 수: {result['saved_count']:,}")
     # print(f"중복 제외: {result['ignored_count']:,}")
 
+    
+    # rows = fetch_financial_statements_from_db(
+    #     corp_code="00126380",
+    #     bsns_year="2025",
+    #     reprt_code="11011",
+    #     fs_div="CFS",
+    # )
+
+    # print(f"조회 행 수: {len(rows)}")
+
+    # print_financial_statements(rows)
+
     rows = fetch_financial_statements_from_db(
         corp_code="00126380",
         bsns_year="2025",
@@ -125,6 +173,20 @@ def main() -> None:
     print(f"조회 행 수: {len(rows)}")
 
     print_financial_statements(rows)
+
+    try:
+        ratio_result = calculate_financial_ratios(
+            rows
+        )
+
+    except FinancialRatioCalculationError as error:
+        print()
+        print(f"재무비율 계산 실패: {error}")
+
+    else:
+        print_financial_ratios(
+            ratio_result
+        )
 
 
 if __name__ == "__main__":
