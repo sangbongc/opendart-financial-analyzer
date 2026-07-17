@@ -416,3 +416,37 @@ def count_corporations() -> int:
         return 0
 
     return int(row[0])
+
+def count_corporations_by_keyword(
+    keyword: str,
+) -> int:
+    """
+    키워드와 일치하는 활성 기업의 전체 개수를 반환한다.
+    """
+    normalized_keyword = keyword.strip()
+
+    if not normalized_keyword:
+        return 0
+
+    search_keyword = f"%{normalized_keyword}%"
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS total_count
+            FROM dart_corporations
+            WHERE is_active = 1
+              AND (
+                  corp_name LIKE ?
+                  OR stock_code LIKE ?
+                  OR corp_code LIKE ?
+              )
+            """,
+            (
+                search_keyword,
+                search_keyword,
+                search_keyword,
+            ),
+        ).fetchone()
+
+    return int(row["total_count"])

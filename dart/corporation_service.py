@@ -10,6 +10,7 @@ from database.corporation_repository import (
     search_corporations_by_name,
     fetch_corporation_by_corp_code,
     fetch_corporation_by_stock_code,
+    count_corporations_by_keyword,
 )
 
 
@@ -224,3 +225,30 @@ def find_corporations(
         active_only=active_only,
         limit=limit,
     )
+
+def find_corporations_with_count(
+    keyword: str,
+    limit: int = 20,
+) -> dict:
+    normalized_keyword = keyword.strip()
+
+    corporations = find_corporations(
+        query=normalized_keyword,
+        limit=limit,
+    )
+
+    if (
+        _is_stock_code(normalized_keyword)
+        or _is_corp_code(normalized_keyword)
+    ):
+        total_count = len(corporations)
+
+    else:
+        total_count = count_corporations_by_keyword(
+            normalized_keyword,
+        )
+
+    return {
+        "corporations": corporations,
+        "total_count": total_count,
+    }
