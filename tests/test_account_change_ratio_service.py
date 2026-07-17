@@ -96,12 +96,12 @@ def test_calculate_account_change_ratios() -> None:
 
 @patch(
     "analysis.account_change_ratio_service."
-    "find_financial_statements"
+    "fetch_financial_statements_from_db"
 )
 def test_get_account_change_ratios(
-    mock_find_financial_statements: Mock,
+    mock_fetch_financial_statements_from_db: Mock,
 ) -> None:
-    mock_find_financial_statements.return_value = [
+    mock_fetch_financial_statements_from_db.return_value = [
         {
             "corp_code": "00126380",
             "bsns_year": "2025",
@@ -128,7 +128,7 @@ def test_get_account_change_ratios(
         sj_div="BS",
     )
 
-    mock_find_financial_statements.assert_called_once_with(
+    mock_fetch_financial_statements_from_db.assert_called_once_with(
         corp_code="00126380",
         bsns_year="2025",
         reprt_code="11011",
@@ -142,12 +142,12 @@ def test_get_account_change_ratios(
 
 @patch(
     "analysis.account_change_ratio_service."
-    "find_financial_statements"
+    "fetch_financial_statements_from_db"
 )
 def test_get_account_change_ratios_empty(
-    mock_find_financial_statements: Mock,
+    mock_fetch_financial_statements_from_db: Mock,
 ) -> None:
-    mock_find_financial_statements.return_value = []
+    mock_fetch_financial_statements_from_db.return_value = []
 
     results = get_account_change_ratios(
         corp_code="00126380",
@@ -159,12 +159,12 @@ def test_get_account_change_ratios_empty(
 
 @patch(
     "analysis.account_change_ratio_service."
-    "find_financial_statements"
+    "fetch_financial_statements_from_db"
 )
 def test_get_account_change_ratios_repository_error(
-    mock_find_financial_statements: Mock,
+    mock_fetch_financial_statements_from_db: Mock,
 ) -> None:
-    mock_find_financial_statements.side_effect = RuntimeError(
+    mock_fetch_financial_statements_from_db.side_effect = RuntimeError(
         "database error"
     )
 

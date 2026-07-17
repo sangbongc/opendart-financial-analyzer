@@ -130,6 +130,7 @@ def fetch_financial_statements_from_db(
     bsns_year: str | None = None,
     reprt_code: str | None = None,
     fs_div: str | None = None,
+    sj_div: str | None = None,
 ) -> list[dict]:
     """
     기업의 재무제표 원본 행을 조회한다.
@@ -186,6 +187,9 @@ def fetch_financial_statements_from_db(
     if fs_div is not None:
         query += " AND fs_div = ?"
         parameters.append(fs_div)
+    if sj_div is not None:
+        query += " AND sj_div = ?"
+        parameters.append(sj_div)
 
     query += """
         ORDER BY

@@ -157,6 +157,78 @@ def create_financial_statement_tables(
         """
     )
 
+def create_financial_ratio_tables(
+    connection: sqlite3.Connection,
+) -> None:
+    """
+    재무제표를 기반으로 계산한 재무비율 결과를 저장하는
+    테이블과 조회용 인덱스를 생성한다.
+
+    하나의 기업, 사업연도, 보고서, 재무제표 구분별로
+    각 재무비율을 한 행씩 저장한다.
+
+    이미 테이블과 인덱스가 존재하면 새로 만들지 않는다.
+    """
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS financial_ratio_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            corp_code TEXT NOT NULL,
+            bsns_year TEXT NOT NULL,
+            reprt_code TEXT NOT NULL,
+            fs_div TEXT NOT NULL,
+
+            ratio_code TEXT NOT NULL,
+            ratio_name TEXT NOT NULL,
+            ratio_value REAL,
+
+            numerator_value INTEGER,
+            denominator_value INTEGER,
+
+            calculation_version TEXT NOT NULL DEFAULT 'v1',
+            calculated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (corp_code)
+                REFERENCES dart_corporations(corp_code),
+
+            UNIQUE (
+                corp_code,
+                bsns_year,
+                reprt_code,
+                fs_div,
+                ratio_code,
+                calculation_version
+            )
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_ratio_results_corp_year
+        ON financial_ratio_results(
+            corp_code,
+            bsns_year
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_ratio_results_report
+        ON financial_ratio_results(
+            corp_code,
+            bsns_year,
+            reprt_code,
+            fs_div
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_ratio_results_ratio
+        ON financial_ratio_results(
+            ratio_code,
+            bsns_year
+        );
+        """
+    )
 
 def create_tables() -> None:
     """
@@ -170,7 +242,8 @@ def create_tables() -> None:
     try:
         create_corporations_table(connection)
         create_financial_statement_tables(connection)
-
+        create_financial_ratio_tables(connection)
+                
         connection.commit()
 
     except Exception:
