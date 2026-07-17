@@ -338,37 +338,37 @@ def main() -> None:
     #     )
     
     ##증감률 출력 테스트
-    # corp_code = "00126380"
-    # bsns_year = "2025"
-    # reprt_code = "11011"
-    # fs_div = "CFS"
-    # sj_div = "BS"
+    corp_code = "00126380"
+    bsns_year = "2024"
+    reprt_code = "11011"
+    fs_div = "CFS"
+    sj_div = "IS"
 
-    # print("계정별 증감률을 계산합니다.")
-    # print(f"기업 고유번호: {corp_code}")
-    # print(f"사업연도: {bsns_year}")
-    # print(f"보고서 코드: {reprt_code}")
-    # print(f"재무제표 구분: {fs_div}")
-    # print(f"재무제표 종류: {sj_div}")
+    print("계정별 증감률을 계산합니다.")
+    print(f"기업 고유번호: {corp_code}")
+    print(f"사업연도: {bsns_year}")
+    print(f"보고서 코드: {reprt_code}")
+    print(f"재무제표 구분: {fs_div}")
+    print(f"재무제표 종류: {sj_div}")
 
-    # try:
-    #     results = get_account_change_ratios(
-    #         corp_code=corp_code,
-    #         bsns_year=bsns_year,
-    #         reprt_code=reprt_code,
-    #         fs_div=fs_div,
-    #         sj_div=sj_div,
-    #     )
-    # except Exception as error:
-    #     print()
-    #     print(
-    #         "계정별 증감률을 계산하는 중 "
-    #         f"오류가 발생했습니다: {error}"
-    #     )
-    #     traceback.print_exc()
-    #     return
+    try:
+        results = get_account_change_ratios(
+            corp_code=corp_code,
+            bsns_year=bsns_year,
+            reprt_code=reprt_code,
+            fs_div=fs_div,
+            sj_div=sj_div,
+        )
+    except Exception as error:
+        print()
+        print(
+            "계정별 증감률을 계산하는 중 "
+            f"오류가 발생했습니다: {error}"
+        )
+        traceback.print_exc()
+        return
 
-    # print_account_change_ratios(results)
+    print_account_change_ratios(results)
 
     ##재무비율 저장 테스트
     # corp_code = "00126380"       # 삼성전자
