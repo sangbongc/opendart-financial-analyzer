@@ -10,6 +10,10 @@ from database.corporation_repository import (
 from dart.financial_statement_service import (
     sync_financial_statements,
 )
+from dart.financial_ratio_service import (
+    FinancialRatioCalculationError,
+    calculate_and_save_financial_ratios,
+)
 REPORT_CODE_ALIASES = {
     "annual": "11011",
     "a": "11011",
@@ -87,6 +91,9 @@ class ConsoleController:
             
             elif command == "fs":
                 self._handle_sync_financial_statements()
+            
+            elif command == "ratio":
+                self._handle_calculate_financial_ratios()
 
             elif command in {
                 "exit",
@@ -116,6 +123,7 @@ help                  명령어 목록 출력
 sync                  DART 기업 고유번호 목록 동기화
 find                  기업명 또는 종목코드로 기업 검색
 fs                    기업 재무제표 수집 및 저장
+ratio                 저장된 재무제표로 재무비율 계산
 exit                  프로그램 종료
 """
         )
@@ -439,3 +447,123 @@ exit                  프로그램 종료
                 "지원하지 않는 재무제표 구분입니다. "
                 "CFS 또는 OFS를 입력하세요."
             )
+    def _handle_calculate_financial_ratios(self) -> None:
+        """
+        기업과 재무제표 조건을 입력받아
+        재무비율을 계산하고 저장한다.
+        """
+        corporation = self._select_corporation()
+
+        if corporation is None:
+            return
+
+        conditions = (
+            self._input_financial_statement_conditions()
+        )
+
+        print("\n[재무비율 계산 조건]")
+        print("-" * 60)
+        print(f"기업명: {corporation['corp_name']}")
+        print(f"고유번호: {corporation['corp_code']}")
+        print(f"사업연도: {conditions['bsns_year']}")
+        print(f"보고서 코드: {conditions['reprt_code']}")
+        print(f"재무제표 구분: {conditions['fs_div']}")
+
+        try:
+            result = calculate_and_save_financial_ratios(
+                corp_code=corporation["corp_code"],
+                bsns_year=conditions["bsns_year"],
+                reprt_code=conditions["reprt_code"],
+                fs_div=conditions["fs_div"],
+            )
+
+        except FinancialRatioCalculationError as error:
+            print(f"\n재무비율 계산 실패: {error}")
+            return
+
+        except Exception as error:
+            print(
+                "\n재무비율 계산 중 예상하지 못한 "
+                f"오류가 발생했습니다: {error}"
+            )
+            return
+
+        print("\n[재무비율 계산 결과]")
+        print("-" * 60)
+        print("\n[재무비율 계산 결과]")
+        print("-" * 60)
+
+        for ratio in result["ratios"]:
+            print(
+                f"{ratio['ratio_name']}: "
+                f"{self._format_ratio(ratio['ratio_value'])}"
+            )
+
+        print("-" * 60)
+        print(f"계산 비율 수: {result['calculated_count']}")
+        print(f"저장 또는 갱신: {result['saved_count']}")
+    @staticmethod
+    def _format_ratio(
+        value: float | None,
+    ) -> str:
+        """
+        계산된 재무비율을 출력용 문자열로 변환한다.
+        """
+        if value is None:
+            return "계산 불가"
+
+        return f"{value:,.2f}%"
+    
+    def _handle_ratio(self) -> None:
+        """
+        저장된 재무제표를 이용하여
+        재무비율을 계산한다.
+        """
+        corporation = self._select_corporation()
+
+        if corporation is None:
+            return
+
+        conditions = (
+            self._input_financial_statement_conditions()
+        )
+
+        try:
+            result = calculate_and_save_financial_ratios(
+                corp_code=corporation["corp_code"],
+                bsns_year=conditions["bsns_year"],
+                reprt_code=conditions["reprt_code"],
+                fs_div=conditions["fs_div"],
+            )
+
+        except FinancialRatioCalculationError as error:
+            print(f"\n계산 실패: {error}")
+            return
+
+        except Exception as error:
+            print(f"\n예상하지 못한 오류: {error}")
+            return
+
+        print("\n재무비율 계산 완료")
+        print(f"계산 비율 수: {result['calculated_count']}")
+        print(f"저장 행 수: {result['saved_count']}")
+
+        print("\n[계산 결과]")
+        print("-" * 60)
+
+        for ratio in result["ratios"]:
+            value = ratio["ratio_value"]
+
+            if value is None:
+                display = "계산 불가"
+            else:
+                display = f"{value:.2f}%"
+
+            print(
+                f"{ratio['ratio_name']:<12}"
+                f"{display}"
+            )
+
+        if result["unavailable_ratios"]:
+            print("\n계산 불가")
+        print(", ".join(result["unavailable_ratios"]))
