@@ -1,4 +1,5 @@
 #보조 기능 제공
+from wcwidth import wcswidth
 REPORT_CODE_ALIASES = {
     "annual": "11011",
     "a": "11011",
