@@ -1,4 +1,5 @@
 from database.schema import create_tables
+from pprint import pprint
 
 from dart.financial_statement_service import (
     sync_financial_statements,
@@ -11,6 +12,10 @@ from analysis.financial_ratio_service import (
     calculate_financial_ratios,
 )
 
+from dart.financial_ratio_service import (
+    FinancialRatioCalculationError,
+    calculate_and_save_financial_ratios,
+)
 from wcwidth import wcswidth
 
 from decimal import Decimal, InvalidOperation
@@ -364,6 +369,80 @@ def main() -> None:
     #     return
 
     # print_account_change_ratios(results)
+
+    ##재무비율 저장 테스트
+    # corp_code = "00126380"       # 삼성전자
+    # bsns_year = "2025"
+    # reprt_code = "11011"         # 사업보고서
+    # fs_div = "CFS"               # 연결재무제표
+    # calculation_version = "v2_average_balance"
+
+    # print("재무비율 계산 및 저장을 시작합니다.")
+    # print("-" * 60)
+    # print(f"기업 고유번호: {corp_code}")
+    # print(f"사업연도: {bsns_year}")
+    # print(f"보고서 코드: {reprt_code}")
+    # print(f"재무제표 구분: {fs_div}")
+    # print(f"계산 버전: {calculation_version}")
+
+    # try:
+    #     result = calculate_and_save_financial_ratios(
+    #         corp_code=corp_code,
+    #         bsns_year=bsns_year,
+    #         reprt_code=reprt_code,
+    #         fs_div=fs_div,
+    #         calculation_version=calculation_version,
+    #     )
+
+    # except FinancialRatioCalculationError as error:
+    #     print(f"\n재무비율 계산 실패: {error}")
+    #     return
+
+    # except Exception as error:
+    #     print(f"\n예상하지 못한 오류가 발생했습니다: {error}")
+    #     return
+
+    # print("\n재무비율 계산 및 저장 완료")
+    # print("-" * 60)
+    # print(f"계산 비율 수: {result['calculated_count']}")
+    # print(f"저장 비율 수: {result['saved_count']}")
+
+    # unavailable_ratios = result.get(
+    #     "unavailable_ratios",
+    #     [],
+    # )
+
+    # if unavailable_ratios:
+    #     print(
+    #         "계산 불가 비율: "
+    #         + ", ".join(unavailable_ratios)
+    #     )
+    # else:
+    #     print("계산 불가 비율: 없음")
+
+    # print("\n[계산 결과]")
+
+    # for ratio in result["ratios"]:
+    #     ratio_value = ratio["ratio_value"]
+    #     numerator = ratio["numerator_value"]
+    #     denominator = ratio["denominator_value"]
+
+    #     if ratio_value is None:
+    #         ratio_value_text = "계산 불가"
+    #     else:
+    #         ratio_value_text = f"{ratio_value:,.4f}%"
+
+    #     print("-" * 60)
+    #     print(
+    #         f"{ratio['ratio_name']} "
+    #         f"({ratio['ratio_code']})"
+    #     )
+    #     print(f"비율: {ratio_value_text}")
+    #     print(f"분자: {numerator}")
+    #     print(f"분모: {denominator}")
+
+    # print("\n[전체 결과]")
+    # pprint(result)
 
 
 if __name__ == "__main__":
