@@ -399,3 +399,20 @@ def search_corporations_by_name(
 
     finally:
         connection.close()
+
+def count_corporations() -> int:
+    """
+    저장된 기업 정보의 전체 개수를 반환한다.
+    """
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM dart_corporations
+            """
+        ).fetchone()
+
+    if row is None:
+        return 0
+
+    return int(row[0])
