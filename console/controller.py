@@ -14,6 +14,8 @@ from dart.financial_ratio_service import (
     FinancialRatioCalculationError,
     calculate_and_save_financial_ratios,
 )
+from database.financial_ratio_repository import fetch_financial_ratios
+
 REPORT_CODE_ALIASES = {
     "annual": "11011",
     "a": "11011",
@@ -94,6 +96,9 @@ class ConsoleController:
             
             elif command == "ratio":
                 self._handle_calculate_financial_ratios()
+            
+            elif command == "ratios":
+                self._handle_show_financial_ratios()
 
             elif command in {
                 "exit",
@@ -124,6 +129,7 @@ sync                  DART 기업 고유번호 목록 동기화
 find                  기업명 또는 종목코드로 기업 검색
 fs                    기업 재무제표 수집 및 저장
 ratio                 저장된 재무제표로 재무비율 계산
+ratios                저장된 재무비율 출력
 exit                  프로그램 종료
 """
         )
@@ -490,8 +496,6 @@ exit                  프로그램 종료
 
         print("\n[재무비율 계산 결과]")
         print("-" * 60)
-        print("\n[재무비율 계산 결과]")
-        print("-" * 60)
 
         for ratio in result["ratios"]:
             print(
@@ -502,6 +506,58 @@ exit                  프로그램 종료
         print("-" * 60)
         print(f"계산 비율 수: {result['calculated_count']}")
         print(f"저장 또는 갱신: {result['saved_count']}")
+    def _handle_show_financial_ratios(
+        self,
+    ) -> None:
+        """
+        저장된 재무비율을 조회하여 출력한다.
+        """
+        corporation = self._select_corporation()
+
+        if corporation is None:
+            return
+
+        conditions = (
+            self._input_financial_statement_conditions()
+        )
+
+        try:
+            ratios = fetch_financial_ratios(
+                corp_code=corporation["corp_code"],
+                bsns_year=conditions["bsns_year"],
+                reprt_code=conditions["reprt_code"],
+                fs_div=conditions["fs_div"],
+            )
+
+        except Exception as error:
+            print(
+                "\n재무비율 조회 중 예상하지 못한 "
+                f"오류가 발생했습니다: {error}"
+            )
+            return
+
+        print("\n[저장된 재무비율]")
+        print("-" * 60)
+        print(f"기업명: {corporation['corp_name']}")
+        print(f"고유번호: {corporation['corp_code']}")
+        print(f"사업연도: {conditions['bsns_year']}")
+        print(f"보고서 코드: {conditions['reprt_code']}")
+        print(f"재무제표 구분: {conditions['fs_div']}")
+        print("-" * 60)
+
+        if not ratios:
+            print("조건에 해당하는 저장된 재무비율이 없습니다.")
+            return
+
+        for ratio in ratios:
+            print(
+                f"{ratio['ratio_name']}: "
+                f"{self._format_ratio(ratio['ratio_value'])}"
+            )
+
+        print("-" * 60)
+        print(f"조회 비율 수: {len(ratios)}")
+    
     @staticmethod
     def _format_ratio(
         value: float | None,

@@ -507,3 +507,18 @@ def calculate_and_save_financial_ratios(
         "unavailable_ratios": unavailable_ratios,
         "ratios": ratios,
     }
+
+def get_financial_ratios(
+    corp_code: str,
+    bsns_year: str,
+    reprt_code: str = "11011",
+    fs_div: str = "CFS",
+) -> list[dict]:
+    ratios = fetch_financial_ratios(
+        corp_code=corp_code,
+        bsns_year=bsns_year,
+        reprt_code=reprt_code,
+        fs_div=fs_div,
+    )
+
+    return ratios
