@@ -106,8 +106,6 @@ SQLite 저장
 opendart-financial-analyzer/
 │
 ├── analysis/
-│   ├── __init__.py
-│   ├── account_change_ratio_service.py
 │   └── financial_ratio_service.py
 │
 ├── console/
@@ -115,15 +113,12 @@ opendart-financial-analyzer/
 │   └── controller.py
 │
 ├── dart/
-│   ├── __init__.py
 │   ├── client.py
-│   ├── corporation_parser.py
 │   ├── corporation_service.py
 │   ├── financial_statement_parser.py
 │   └── financial_statement_service.py
 │
 ├── database/
-│   ├── __init__.py
 │   ├── connection.py
 │   ├── corporation_repository.py
 │   ├── financial_ratio_repository.py
@@ -135,14 +130,16 @@ opendart-financial-analyzer/
 │
 ├── tests/
 │
-├── .env.example
-├── .gitignore
 ├── config.py
 ├── integration_main.py
 ├── main.py
+├── utils.py
 ├── requirements.txt
 └── README.md
 ```
+
+각 디렉터리는 데이터 수집, 저장, 분석, 사용자 입력 처리를 담당하며, 여러 계층에서 반복적으로 사용하는 출력 및 변환 보조 기능은 `utils.py`로 분리했습니다.
+
 
 ---
 
