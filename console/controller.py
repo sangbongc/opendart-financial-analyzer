@@ -20,7 +20,15 @@ from dart.financial_ratio_service import (
     FinancialRatioCalculationError,
     calculate_and_save_financial_ratios,
 )
+from dart.financial_change_ratio_service import (
+    print_account_change_ratios
+)
+from analysis.account_change_ratio_service import (
+    get_account_change_ratios,
+)
+
 from database.financial_ratio_repository import fetch_financial_ratios
+
 from utils import (
     REPORT_CODE_ALIASES,
     REPORT_CODE_NAMES,
@@ -30,6 +38,7 @@ from utils import (
     pad_right,
     format_amount,
 )
+
 
 class ConsoleController:
     """
@@ -82,6 +91,9 @@ class ConsoleController:
             elif command == "ratios":
                 self._handle_show_financial_ratios()
 
+            elif command == "change":
+                self._handle_account_change_ratios()
+
             elif command in {
                 "exit",
                 "quit",
@@ -113,6 +125,7 @@ fs                    기업 재무제표 수집 및 저장
 view                  저장된 재무제표 출력
 ratio                 저장된 재무제표로 재무비율 계산
 ratios                저장된 재무비율 출력
+change                계정별 당기·전기 금액과 증감률을 조회합니다.
 exit                  프로그램 종료
 """
         )
@@ -788,3 +801,68 @@ exit                  프로그램 종료
                 f"총 계정 수: "
                 f"{len(statement_rows):,}개"
             )
+    def _handle_account_change_ratios(self) -> None:
+        """
+        저장된 재무제표를 기반으로 계정별 증감률을 계산하고 출력한다.
+        """
+        print()
+        print("[계정별 증감률 조회]")
+        print("-" * 60)
+
+        corporation = self._select_corporation()
+
+        if corporation is None:
+            return
+
+        bsns_year = input(
+            "사업연도를 입력하세요: "
+        ).strip()
+
+        if not bsns_year:
+            print("사업연도를 입력해야 합니다.")
+            return
+
+        reprt_code = "11011"
+
+        fs_div = input(
+            "재무제표 구분을 입력하세요 "
+            "(CFS: 연결, OFS: 별도) [CFS]: "
+        ).strip().upper()
+
+        if not fs_div:
+            fs_div = "CFS"
+
+        sj_div = input(
+            "재무제표 종류를 입력하세요 "
+            "(BS: 재무상태표, IS: 손익계산서, "
+            "CIS: 포괄손익계산서, CF: 현금흐름표): "
+        ).strip().upper()
+
+        if sj_div not in {
+            "BS",
+            "IS",
+            "CIS",
+            "CF",
+        }:
+            print("올바른 재무제표 종류를 입력하세요.")
+            return
+
+        try:
+            results = get_account_change_ratios(
+                corp_code=corporation["corp_code"],
+                bsns_year=bsns_year,
+                reprt_code=reprt_code,
+                fs_div=fs_div,
+                sj_div=sj_div,
+            )
+
+        except Exception as error:
+            print(
+                "계정별 증감률 계산 중 "
+                f"오류가 발생했습니다: {error}"
+            )
+            return
+
+        print_account_change_ratios(
+            results
+        )

@@ -1,5 +1,7 @@
 #보조 기능 제공
 from wcwidth import wcswidth
+from decimal import Decimal, InvalidOperation
+
 REPORT_CODE_ALIASES = {
     "annual": "11011",
     "a": "11011",
@@ -87,11 +89,33 @@ def pad_right(text: str, width: int) -> str:
         width - wcswidth(text),
     ) + text
 
+
 def format_amount(value: object) -> str:
+    """
+    숫자 또는 Decimal 값을 천 단위 구분기호가 포함된 문자열로 변환한다.
+    값이 없거나 숫자로 변환할 수 없으면 '-'를 반환한다.
+    """
     if value is None:
         return "-"
 
     try:
-        return f"{int(value):,}"
-    except (TypeError, ValueError):
+        amount = Decimal(str(value).replace(",", ""))
+    except (InvalidOperation, ValueError, TypeError):
         return str(value)
+
+    return f"{amount:,.0f}"
+
+def format_ratio(value: object) -> str:
+    """
+    증감률을 소수점 둘째 자리까지 표시한다.
+    전기 금액이 0이어서 계산할 수 없는 경우 '-'를 반환한다.
+    """
+    if value is None:
+        return "-"
+
+    try:
+        ratio = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return str(value)
+
+    return f"{ratio:,.2f}%"

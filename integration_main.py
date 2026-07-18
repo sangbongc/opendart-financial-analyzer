@@ -13,7 +13,7 @@ from analysis.financial_ratio_service import (
 )
 
 from dart.financial_ratio_service import (
-    FinancialRatioCalculationError,
+    FinancialRatioCalculationError  as RatioSaveError,
     calculate_and_save_financial_ratios,
 )
 from wcwidth import wcswidth
