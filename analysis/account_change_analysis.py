@@ -207,6 +207,9 @@ def analyze_inventory_vs_revenue(
     results: list[dict[str, Any]],
     difference_threshold: float = 10.0,
 ) -> dict[str, Any] | None:
+    """
+    기본 임계값은 10%p를 기준으로 한다
+    """
     revenue = _find_account_result(
         results,
         (
