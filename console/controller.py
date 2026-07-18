@@ -6,13 +6,14 @@ from database.financial_statement_repository import(
 from database.corporation_repository import (
     count_corporations,
 )
+from database.financial_ratio_repository import fetch_financial_ratios
+
 from dart.corporation_service import (
     CorporationSyncError,
     sync_corporations,
     find_corporations,
     find_corporations_with_count
 )
-
 from dart.financial_statement_service import (
     sync_financial_statements,
 )
@@ -23,11 +24,14 @@ from dart.financial_ratio_service import (
 from dart.financial_change_ratio_service import (
     print_account_change_ratios
 )
+
 from analysis.account_change_ratio_service import (
     get_account_change_ratios,
 )
-
-from database.financial_ratio_repository import fetch_financial_ratios
+from analysis.account_change_analysis import (
+    analyze_major_account_changes,
+    print_major_account_analyses,
+)
 
 from utils import (
     REPORT_CODE_ALIASES,
@@ -866,3 +870,8 @@ exit                  프로그램 종료
         print_account_change_ratios(
             results
         )
+        print_account_change_ratios(results)
+
+        analyses = analyze_major_account_changes(results)
+
+        print_major_account_analyses(analyses)
