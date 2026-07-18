@@ -171,3 +171,100 @@ def print_major_account_analyses(
             f"{abs(change_ratio):,.2f}% {direction}"
         )
         print(f"  {message}")
+
+def _normalize_account_name(account_name: str) -> str:
+    return (
+        account_name
+        .replace(" ", "")
+        .replace("(손실)", "")
+    )
+
+
+def _find_account_result(
+    results: list[dict[str, Any]],
+    aliases: tuple[str, ...],
+) -> dict[str, Any] | None:
+    normalized_aliases = {
+        _normalize_account_name(alias)
+        for alias in aliases
+    }
+
+    for result in results:
+        account_name = str(
+            result.get("account_nm") or ""
+        )
+
+        normalized_name = _normalize_account_name(
+            account_name
+        )
+
+        if normalized_name in normalized_aliases:
+            return result
+
+    return None
+
+def analyze_inventory_vs_revenue(
+    results: list[dict[str, Any]],
+    difference_threshold: float = 10.0,
+) -> dict[str, Any] | None:
+    revenue = _find_account_result(
+        results,
+        (
+            "매출액",
+            "수익(매출액)",
+            "영업수익",
+        ),
+    )
+
+    inventory = _find_account_result(
+        results,
+        (
+            "재고자산",
+        ),
+    )
+
+    if revenue is None or inventory is None:
+        return None
+
+    revenue_ratio = revenue.get("change_ratio")
+    inventory_ratio = inventory.get("change_ratio")
+
+    if revenue_ratio is None or inventory_ratio is None:
+        return None
+
+    try:
+        revenue_ratio = float(revenue_ratio)
+        inventory_ratio = float(inventory_ratio)
+    except (TypeError, ValueError):
+        return None
+
+    difference = inventory_ratio - revenue_ratio
+
+    if difference < difference_threshold:
+        return None
+
+    return {
+        "title": "재고자산과 매출액 변동 비교",
+        "message": (
+            f"재고자산 증가율({inventory_ratio:,.2f}%)이 "
+            f"매출액 증가율({revenue_ratio:,.2f}%)보다 "
+            f"{difference:,.2f}%p 높습니다. "
+            "재고 구성, 판매 추이 및 재고평가 관련 사항을 "
+            "추가로 확인할 필요가 있습니다."
+        ),
+    }
+
+def print_inventory_vs_revenue_analysis(
+    analysis: dict[str, Any] | None,
+) -> None:
+    print("\n[매출액과 재고자산 변동 비교]")
+    print("-" * 60)
+
+    if analysis is None:
+        print(
+            "비교 기준을 충족하는 매출액과 "
+            "재고자산 변동이 없습니다."
+        )
+        return
+
+    print(analysis["message"])

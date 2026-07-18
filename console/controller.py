@@ -27,10 +27,16 @@ from dart.financial_change_ratio_service import (
 
 from analysis.account_change_ratio_service import (
     get_account_change_ratios,
+    get_combined_account_change_ratios
 )
 from analysis.account_change_analysis import (
     analyze_major_account_changes,
     print_major_account_analyses,
+    analyze_inventory_vs_revenue,
+    _normalize_account_name,
+    _find_account_result,
+    print_inventory_vs_revenue_analysis,
+
 )
 
 from utils import (
@@ -860,6 +866,13 @@ exit                  프로그램 종료
                 sj_div=sj_div,
             )
 
+            analysis_results = get_combined_account_change_ratios(
+                corp_code=corporation["corp_code"],
+                bsns_year=bsns_year,
+                reprt_code=reprt_code,
+                fs_div=fs_div,
+            )
+
         except Exception as error:
             print(
                 "계정별 증감률 계산 중 "
@@ -867,11 +880,23 @@ exit                  프로그램 종료
             )
             return
 
-        print_account_change_ratios(
-            results
-        )
+        # 사용자가 선택한 재무제표의 증감률 출력
         print_account_change_ratios(results)
 
-        analyses = analyze_major_account_changes(results)
+        # 주요 계정의 개별 변동 분석
+        major_analyses = analyze_major_account_changes(
+            analysis_results
+        )
 
-        print_major_account_analyses(analyses)
+        print_major_account_analyses(
+            major_analyses
+        )
+
+        # 매출액과 재고자산 증감률 비교
+        inventory_analysis = analyze_inventory_vs_revenue(
+            analysis_results
+        )
+
+        print_inventory_vs_revenue_analysis(
+            inventory_analysis
+        )

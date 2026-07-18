@@ -211,3 +211,36 @@ def get_account_change_ratios(
     return calculate_account_change_ratios(
         financial_statements
     )
+
+def get_combined_account_change_ratios(
+    corp_code: str,
+    bsns_year: str,
+    reprt_code: str,
+    fs_div: str,
+    sj_divs: tuple[str, ...] = ("BS", "IS", "CIS"),
+) -> list[dict[str, Any]]:
+    combined_results: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    for sj_div in sj_divs:
+        results = get_account_change_ratios(
+            corp_code=corp_code,
+            bsns_year=bsns_year,
+            reprt_code=reprt_code,
+            fs_div=fs_div,
+            sj_div=sj_div,
+        )
+
+        for result in results:
+            account_key = (
+                str(result.get("account_id") or ""),
+                str(result.get("account_nm") or ""),
+            )
+
+            if account_key in seen_keys:
+                continue
+
+            seen_keys.add(account_key)
+            combined_results.append(result)
+
+    return combined_results
