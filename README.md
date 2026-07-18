@@ -14,8 +14,11 @@ OpenDART API를 이용하여 기업 기준정보와 재무제표를 수집하고
 * SQLite 저장 및 중복 방지
 * 주요 재무비율 계산
 * 재무비율 계산 결과 저장 및 조회
+* 증감률이 큰 계정에 대한 해석
+* 재고자산 증가율과 매출 증가율 비교
 * 계정별 증감액·증감률 계산 로직
 * CLI 기반 기능 실행
+
 
 향후에는 기업 간 비교, 주요 계정 변동 분석, 감사보고서 수집, 핵심감사사항 분석 및 생성형 AI 기반 감사 관점 분석 기능으로 확장할 계획입니다.
 
@@ -53,6 +56,7 @@ SQLite 저장
 
 재무비율은 DART 응답을 받은 즉시 계산하지 않고, 데이터베이스에 저장된 재무제표를 다시 조회하여 계산합니다. 이를 통해 원본 데이터 수집과 파생 분석 결과 생성을 분리했습니다.
 
+재무비율 계산과 계정 변동 분석 기능을 제공하며, 일부 계정 간 관계를 이용한 기초 분석 기능을 포함합니다.
 ---
 
 ## 시스템 구조
@@ -74,17 +78,16 @@ SQLite 저장
        Corporation Repository    Financial Statement Repository
                 └──────────────┬──────────────┘
                                ▼
-                         SQLite Database
-                               │
-                ┌──────────────┴──────────────┐
-                ▼                             ▼
-      Financial Ratio Service     Account Change Ratio Service
-                │
-                ▼
-      Financial Ratio Repository
-                │
-                ▼
-                       ConsoleController
+                        SQLite Database
+                                │
+                ┌────────────────┼────────────────┐
+                ▼                ▼                ▼
+        Financial Ratio   Account Change    Account Change
+        Service            Service          Analysis
+                │                                   │
+                ▼                                   ▼
+        Financial Ratio                  Console Output
+        Repository
 ```
 
 ### 계층별 역할
@@ -106,7 +109,8 @@ SQLite 저장
 opendart-financial-analyzer/
 │
 ├── analysis/
-│   └── financial_ratio_service.py
+│   ├── financial_ratio_service.py
+│   └── account_change_analysis.py
 │
 ├── console/
 │   ├── __init__.py
@@ -364,7 +368,7 @@ OpenDART의 `fnlttSinglAcntAll.json` API를 이용하여 단일회사의 전체 
 * 증감액
 * 증감률
 
-현재 서비스 계층의 계산 로직을 구현한 상태이며, 주요 계정 선별 및 CLI 출력 기능은 후속 개발 대상으로 두고 있습니다.
+* 'change': 저장된 재무제표를 이용해 재무제표 별 계졍벌 증감률을 계산하고 당기 금액, 전기 금액, 증감액과 증감률을 계산하여 출력합니다. 
 
 ---
 
@@ -754,8 +758,8 @@ pytest
 * [x] 계정별 증감률 계산
 * [x] 전기 금액 0 및 누락 데이터 처리
 * [ ] 주요 분석 계정 선별
-* [ ] 계정 변동 분석 CLI
-* [ ] 재고자산 증가율과 매출 증가율 비교
+* [x] 계정 변동 분석 CLI
+* [x] 재고자산 증가율과 매출 증가율 비교
 * [ ] 변동 임계치 기반 이상징후 표시
 
 ## Phase 6 — 향후 계획
