@@ -1,6 +1,8 @@
 #보조 기능 제공
 from wcwidth import wcswidth
 from decimal import Decimal, InvalidOperation
+from datetime import datetime
+
 
 REPORT_CODE_ALIASES = {
     "annual": "11011",
@@ -105,6 +107,7 @@ def format_amount(value: object) -> str:
 
     return f"{amount:,.0f}"
 
+
 def format_ratio(value: object) -> str:
     """
     증감률을 소수점 둘째 자리까지 표시한다.
@@ -119,3 +122,13 @@ def format_ratio(value: object) -> str:
         return str(value)
 
     return f"{ratio:,.2f}%"
+
+
+def get_current_time() -> str:
+    """
+    현재 시각을 SQLite에 저장하기 좋은 문자열로 반환한다.
+    """
+    return datetime.now().isoformat(
+        sep=" ",
+        timespec="seconds",
+    )

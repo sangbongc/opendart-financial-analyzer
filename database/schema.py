@@ -157,6 +157,7 @@ def create_financial_statement_tables(
         """
     )
 
+
 def create_financial_ratio_tables(
     connection: sqlite3.Connection,
 ) -> None:
@@ -229,6 +230,7 @@ def create_financial_ratio_tables(
         );
         """
     )
+
 
 def create_tables() -> None:
     """

@@ -1,17 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime
-
+from utils import get_current_time
 from database.connection import get_connection
-
-
-def _get_current_time() -> str:
-    """
-    현재 시각을 SQLite에 저장하기 좋은 문자열로 반환한다.
-    """
-    return datetime.now().isoformat(
-        sep=" ",
-        timespec="seconds",
-    )
 
 
 def upsert_financial_ratios(
@@ -31,7 +21,7 @@ def upsert_financial_ratios(
     if not ratio_rows:
         return 0
 
-    calculated_at = _get_current_time()
+    calculated_at = get_current_time()
 
     values = [
         (
@@ -286,3 +276,6 @@ def delete_financial_ratios(
 
     finally:
         connection.close()
+
+
+

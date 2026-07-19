@@ -1,17 +1,10 @@
 from collections.abc import Iterable
 from datetime import datetime
-
+from utils import get_current_time
 from database.connection import get_connection
 
 
-def _get_current_time() -> str:
-    """
-    현재 시각을 SQLite에 저장하기 좋은 문자열로 반환한다.
-    """
-    return datetime.now().isoformat(
-        sep=" ",
-        timespec="seconds",
-    )
+
 
 
 def upsert_corporation(
@@ -34,7 +27,7 @@ def upsert_corporation(
     if not corp_name:
         raise ValueError("corp_name은 비어 있을 수 없습니다.")
 
-    current_time = seen_at or _get_current_time()
+    current_time = seen_at or get_current_time()
 
     connection = get_connection()
 
@@ -86,7 +79,7 @@ def upsert_corporations(
 
     반환값은 처리된 기업 수이다.
     """
-    current_time = seen_at or _get_current_time()
+    current_time = seen_at or get_current_time()
 
     records = []
 
@@ -237,7 +230,7 @@ def deactivate_missing_corporations(
 
     기업 데이터는 삭제하지 않는다.
     """
-    current_time = deactivated_at or _get_current_time()
+    current_time = deactivated_at or get_current_time()
     active_codes = set(active_corp_codes)
 
     connection = get_connection()
@@ -315,7 +308,8 @@ def fetch_all_corporations(
 
     finally:
         connection.close()
-    
+
+
 def search_corporations_by_name(
     keyword: str,
     active_only: bool = True,
@@ -400,6 +394,7 @@ def search_corporations_by_name(
     finally:
         connection.close()
 
+
 def count_corporations() -> int:
     """
     저장된 기업 정보의 전체 개수를 반환한다.
@@ -416,6 +411,7 @@ def count_corporations() -> int:
         return 0
 
     return int(row[0])
+
 
 def count_corporations_by_keyword(
     keyword: str,
@@ -450,3 +446,4 @@ def count_corporations_by_keyword(
         ).fetchone()
 
     return int(row["total_count"])
+

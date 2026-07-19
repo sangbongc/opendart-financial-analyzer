@@ -14,47 +14,6 @@ class AccountChangeRatioError(Exception):
     """
 
 
-def _to_decimal(value: Any) -> Decimal | None:
-    """
-    재무제표 금액을 Decimal로 변환한다.
-
-    다음 값은 None으로 처리한다.
-
-    - None
-    - 빈 문자열
-    - 숫자로 변환할 수 없는 값
-    """
-    if value is None:
-        return None
-
-    if isinstance(value, bool):
-        return None
-
-    if isinstance(value, Decimal):
-        return value
-
-    if isinstance(value, int):
-        return Decimal(value)
-
-    if isinstance(value, float):
-        return Decimal(str(value))
-
-    normalized_value = (
-        str(value)
-        .strip()
-        .replace(",", "")
-    )
-
-    if not normalized_value:
-        return None
-
-    try:
-        return Decimal(normalized_value)
-
-    except InvalidOperation:
-        return None
-
-
 def calculate_account_change_ratio(
     current_amount: Any,
     previous_amount: Any,
@@ -244,3 +203,44 @@ def get_combined_account_change_ratios(
             combined_results.append(result)
 
     return combined_results
+
+
+def _to_decimal(value: Any) -> Decimal | None:
+    """
+    재무제표 금액을 Decimal로 변환한다.
+
+    다음 값은 None으로 처리한다.
+
+    - None
+    - 빈 문자열
+    - 숫자로 변환할 수 없는 값
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, Decimal):
+        return value
+
+    if isinstance(value, int):
+        return Decimal(value)
+
+    if isinstance(value, float):
+        return Decimal(str(value))
+
+    normalized_value = (
+        str(value)
+        .strip()
+        .replace(",", "")
+    )
+
+    if not normalized_value:
+        return None
+
+    try:
+        return Decimal(normalized_value)
+
+    except InvalidOperation:
+        return None

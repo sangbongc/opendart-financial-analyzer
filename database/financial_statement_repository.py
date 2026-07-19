@@ -4,57 +4,6 @@ from typing import Any
 from database.connection import get_connection
 
 
-def _normalize_financial_statement(
-    row: dict[str, Any],
-) -> tuple:
-    """
-    파싱된 재무제표 행을 DB 저장용 튜플로 변환한다.
-
-    account_id와 account_detail은 UNIQUE 제약조건이
-    안정적으로 작동하도록 None 대신 빈 문자열로 저장한다.
-    """
-    required_fields = (
-        "rcept_no",
-        "reprt_code",
-        "bsns_year",
-        "corp_code",
-        "fs_div",
-        "sj_div",
-        "account_nm",
-    )
-
-    for field in required_fields:
-        if not row.get(field):
-            raise ValueError(
-                f"{field}는 비어 있을 수 없습니다."
-            )
-
-    return (
-        row["rcept_no"],
-        row["reprt_code"],
-        row["bsns_year"],
-        row["corp_code"],
-        row["fs_div"],
-        row.get("fs_nm"),
-        row["sj_div"],
-        row.get("sj_nm"),
-        row.get("account_id") or "",
-        row["account_nm"],
-        row.get("account_detail") or "",
-        row.get("thstrm_nm"),
-        row.get("thstrm_amount"),
-        row.get("thstrm_add_amount"),
-        row.get("frmtrm_nm"),
-        row.get("frmtrm_amount"),
-        row.get("frmtrm_q_nm"),
-        row.get("frmtrm_q_amount"),
-        row.get("frmtrm_add_amount"),
-        row.get("bfefrmtrm_nm"),
-        row.get("bfefrmtrm_amount"),
-        row.get("ord"),
-        row.get("currency"),
-    )
-
 
 def save_financial_statements(
     financial_statements: Iterable[dict[str, Any]],
@@ -350,3 +299,55 @@ def count_financial_statements(
 
     finally:
         connection.close()
+
+
+def _normalize_financial_statement(
+    row: dict[str, Any],
+) -> tuple:
+    """
+    파싱된 재무제표 행을 DB 저장용 튜플로 변환한다.
+
+    account_id와 account_detail은 UNIQUE 제약조건이
+    안정적으로 작동하도록 None 대신 빈 문자열로 저장한다.
+    """
+    required_fields = (
+        "rcept_no",
+        "reprt_code",
+        "bsns_year",
+        "corp_code",
+        "fs_div",
+        "sj_div",
+        "account_nm",
+    )
+
+    for field in required_fields:
+        if not row.get(field):
+            raise ValueError(
+                f"{field}는 비어 있을 수 없습니다."
+            )
+
+    return (
+        row["rcept_no"],
+        row["reprt_code"],
+        row["bsns_year"],
+        row["corp_code"],
+        row["fs_div"],
+        row.get("fs_nm"),
+        row["sj_div"],
+        row.get("sj_nm"),
+        row.get("account_id") or "",
+        row["account_nm"],
+        row.get("account_detail") or "",
+        row.get("thstrm_nm"),
+        row.get("thstrm_amount"),
+        row.get("thstrm_add_amount"),
+        row.get("frmtrm_nm"),
+        row.get("frmtrm_amount"),
+        row.get("frmtrm_q_nm"),
+        row.get("frmtrm_q_amount"),
+        row.get("frmtrm_add_amount"),
+        row.get("bfefrmtrm_nm"),
+        row.get("bfefrmtrm_amount"),
+        row.get("ord"),
+        row.get("currency"),
+    )

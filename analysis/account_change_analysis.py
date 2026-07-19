@@ -86,20 +86,6 @@ MAJOR_ACCOUNT_RULES = {
     },
 }
 
-def _find_rule(account_name: str) -> tuple[str, dict[str, Any]] | None:
-    normalized_name = account_name.replace(" ", "")
-
-    for major_name, rule in MAJOR_ACCOUNT_RULES.items():
-        aliases = rule["aliases"]
-
-        for alias in aliases:
-            normalized_alias = alias.replace(" ", "")
-
-            if normalized_name == normalized_alias:
-                return major_name, rule
-
-    return None
-
 
 def analyze_major_account_changes(
     results: list[dict[str, Any]],
@@ -172,36 +158,6 @@ def print_major_account_analyses(
         )
         print(f"  {message}")
 
-def _normalize_account_name(account_name: str) -> str:
-    return (
-        account_name
-        .replace(" ", "")
-        .replace("(손실)", "")
-    )
-
-
-def _find_account_result(
-    results: list[dict[str, Any]],
-    aliases: tuple[str, ...],
-) -> dict[str, Any] | None:
-    normalized_aliases = {
-        _normalize_account_name(alias)
-        for alias in aliases
-    }
-
-    for result in results:
-        account_name = str(
-            result.get("account_nm") or ""
-        )
-
-        normalized_name = _normalize_account_name(
-            account_name
-        )
-
-        if normalized_name in normalized_aliases:
-            return result
-
-    return None
 
 def analyze_inventory_vs_revenue(
     results: list[dict[str, Any]],
@@ -257,6 +213,7 @@ def analyze_inventory_vs_revenue(
         ),
     }
 
+
 def print_inventory_vs_revenue_analysis(
     analysis: dict[str, Any] | None,
 ) -> None:
@@ -271,3 +228,51 @@ def print_inventory_vs_revenue_analysis(
         return
 
     print(analysis["message"])
+
+
+def _find_rule(account_name: str) -> tuple[str, dict[str, Any]] | None:
+    normalized_name = account_name.replace(" ", "")
+
+    for major_name, rule in MAJOR_ACCOUNT_RULES.items():
+        aliases = rule["aliases"]
+
+        for alias in aliases:
+            normalized_alias = alias.replace(" ", "")
+
+            if normalized_name == normalized_alias:
+                return major_name, rule
+
+    return None
+
+
+def _normalize_account_name(account_name: str) -> str:
+    return (
+        account_name
+        .replace(" ", "")
+        .replace("(손실)", "")
+    )
+
+
+def _find_account_result(
+    results: list[dict[str, Any]],
+    aliases: tuple[str, ...],
+) -> dict[str, Any] | None:
+    normalized_aliases = {
+        _normalize_account_name(alias)
+        for alias in aliases
+    }
+
+    for result in results:
+        account_name = str(
+            result.get("account_nm") or ""
+        )
+
+        normalized_name = _normalize_account_name(
+            account_name
+        )
+
+        if normalized_name in normalized_aliases:
+            return result
+
+    return None
+
