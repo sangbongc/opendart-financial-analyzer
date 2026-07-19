@@ -1,6 +1,7 @@
 from typing import Any
 from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
+
 from database.financial_ratio_repository import (
     upsert_financial_ratios,
 )
@@ -56,164 +57,6 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
-STATEMENT_PRIORITY: dict[str, tuple[str, ...]] = {
-    "revenue": (
-        "IS",
-        "CIS",
-    ),
-    "operating_profit": (
-        "IS",
-        "CIS",
-    ),
-    "net_income": (
-        "IS",
-        "CIS",
-    ),
-    "total_assets": (
-        "BS",
-    ),
-    "total_liabilities": (
-        "BS",
-    ),
-    "total_equity": (
-        "BS",
-    ),
-    "current_assets": (
-        "BS",
-    ),
-    "current_liabilities": (
-        "BS",
-    ),
-}
-
-
-def _parse_amount(value: object) -> int | None:
-    """
-    DB에서 조회한 금액을 정수로 변환한다.
-
-    None, 빈 문자열, '-'는 값이 없는 것으로 처리한다.
-    쉼표가 포함된 문자열도 처리한다.
-    """
-    if value is None:
-        return None
-
-    if isinstance(value, bool):
-        return int(value)
-
-    if isinstance(value, int):
-        return value
-
-    if isinstance(value, float):
-        return int(value)
-
-    text = str(value).strip()
-
-    if not text or text == "-":
-        return None
-
-    text = text.replace(",", "")
-
-    try:
-        return int(text)
-    except ValueError as error:
-        raise FinancialRatioCalculationError(
-            f"금액을 숫자로 변환할 수 없습니다: {value}"
-        ) from error
-
-
-def _find_account_row(
-    rows: list[dict[str, Any]],
-    account_key: str,
-) -> dict[str, Any] | None:
-    """
-    계정 별칭과 재무제표 우선순위를 기준으로
-    가장 적합한 재무제표 행을 찾는다.
-    """
-    aliases = ACCOUNT_ALIASES[account_key]
-    statement_priority = STATEMENT_PRIORITY[account_key]
-
-    for statement_code in statement_priority:
-        for alias in aliases:
-            for row in rows:
-                if row.get("sj_div") != statement_code:
-                    continue
-
-                if row.get("account_nm") == alias:
-                    return row
-
-    return None
-
-
-def _get_account_amount(
-    rows: list[dict[str, Any]],
-    account_key: str,
-    amount_field: str = "thstrm_amount",
-    required: bool = True,
-) -> int | None:
-    """
-    지정한 계정의 금액을 반환한다.
-    """
-    row = _find_account_row(
-        rows=rows,
-        account_key=account_key,
-    )
-
-    if row is None:
-        if required:
-            aliases = ", ".join(
-                ACCOUNT_ALIASES[account_key]
-            )
-
-            raise FinancialRatioCalculationError(
-                "필요한 계정을 찾지 못했습니다. "
-                f"계정 후보: {aliases}"
-            )
-
-        return None
-
-    amount = _parse_amount(
-        row.get(amount_field)
-    )
-
-    if amount is None and required:
-        raise FinancialRatioCalculationError(
-            f"{row['account_nm']}의 "
-            f"{amount_field} 값이 없습니다."
-        )
-
-    return amount
-
-
-def _calculate_percentage(
-    numerator: int,
-    denominator: int,
-) -> float | None:
-    """
-    분모가 0이면 None을 반환하고,
-    그 외에는 백분율을 계산한다.
-    """
-    if denominator == 0:
-        return None
-
-    return numerator / denominator * 100
-
-
-def _calculate_average(
-    current_amount: int,
-    previous_amount: int | None,
-) -> float:
-    """
-    전기 금액이 있으면 당기·전기 평균을 계산한다.
-
-    전기 금액이 없으면 당기 금액을 사용한다.
-    """
-    if previous_amount is None:
-        return float(current_amount)
-
-    return (
-        current_amount + previous_amount
-    ) / 2
-
 def calculate_financial_ratios(
     statements: Iterable[dict],
     corp_code: str,
@@ -235,6 +78,9 @@ def calculate_financial_ratios(
     - 유동비율
 
     ROA와 ROE는 당기말과 전기말의 평균잔액을 사용한다.
+
+    계정을 찾지 못하거나 분모가 0인 비율은
+    전체 계산을 중단하지 않고 ratio_value=None으로 반환한다.
     """
     statement_rows = list(statements)
 
@@ -424,6 +270,7 @@ def calculate_financial_ratios(
 
     return ratios
 
+
 def calculate_and_save_financial_ratios(
     corp_code: str,
     bsns_year: str,
@@ -478,6 +325,8 @@ def calculate_and_save_financial_ratios(
         "unavailable_ratios": unavailable_ratios,
         "ratios": ratios,
     }
+
+
 def _normalize_account_name(
     account_name: str | None,
 ) -> str:
@@ -525,51 +374,72 @@ def _parse_amount(
     try:
         return Decimal(text)
 
-    except InvalidOperation:
-        return None
+    except InvalidOperation as error:
+        raise FinancialRatioCalculationError(
+            f"금액을 숫자로 변환할 수 없습니다: {value}"
+        ) from error
 
 
 def _find_account_row(
-    statements: Iterable[dict],
+    statements: Iterable[dict[str, Any]],
     aliases: tuple[str, ...],
     statement_divisions: tuple[str, ...] | None = None,
-) -> dict | None:
-    """
-    계정과목 별칭과 일치하는 재무제표 행을 찾는다.
-
-    statement_divisions를 전달하면 해당 재무제표 구분에서만 찾는다.
-
-    예:
-    - BS: 재무상태표
-    - IS: 손익계산서
-    - CIS: 포괄손익계산서
-    """
-    normalized_aliases = {
+) -> dict[str, Any] | None:
+    normalized_aliases = [
         _normalize_account_name(alias)
         for alias in aliases
+    ]
+
+    alias_priority = {
+        alias: index
+        for index, alias in enumerate(normalized_aliases)
     }
 
-    candidates: list[dict] = []
+    division_priority = {
+        division: index
+        for index, division in enumerate(
+            statement_divisions or ()
+        )
+    }
+
+    candidates: list[dict[str, Any]] = []
 
     for row in statements:
-        if statement_divisions is not None:
-            if row.get("sj_div") not in statement_divisions:
-                continue
+        statement_division = row.get("sj_div")
+
+        if (
+            statement_divisions is not None
+            and statement_division not in statement_divisions
+        ):
+            continue
 
         account_name = _normalize_account_name(
             row.get("account_nm")
         )
 
-        if account_name in normalized_aliases:
+        if account_name in alias_priority:
             candidates.append(row)
 
     if not candidates:
         return None
 
-    # account_detail이 없는 기본 계정 행을 우선한다.
     candidates.sort(
         key=lambda row: (
-            bool(str(row.get("account_detail") or "").strip()),
+            division_priority.get(
+                str(row.get("sj_div")),
+                len(division_priority),
+            ),
+            alias_priority.get(
+                _normalize_account_name(
+                    row.get("account_nm")
+                ),
+                len(alias_priority),
+            ),
+            bool(
+                str(
+                    row.get("account_detail") or ""
+                ).strip()
+            ),
             str(row.get("account_id") or ""),
         )
     )
@@ -578,7 +448,7 @@ def _find_account_row(
 
 
 def _extract_account_amounts(
-    statements: list[dict],
+    statements: list[dict[str, Any]],
     account_key: str,
     statement_divisions: tuple[str, ...] | None = None,
 ) -> tuple[Decimal | None, Decimal | None]:
@@ -590,23 +460,20 @@ def _extract_account_amounts(
     tuple
         (당기 금액, 전기 금액)
     """
-    aliases = ACCOUNT_ALIASES[account_key]
-
-    row = _find_account_row(
-        statements=statements,
-        aliases=aliases,
+    current_amount = _get_account_amount(
+        rows=statements,
+        account_key=account_key,
+        amount_field="thstrm_amount",
         statement_divisions=statement_divisions,
+        required=False,
     )
 
-    if row is None:
-        return None, None
-
-    current_amount = _parse_amount(
-        row.get("thstrm_amount")
-    )
-
-    previous_amount = _parse_amount(
-        row.get("frmtrm_amount")
+    previous_amount = _get_account_amount(
+        rows=statements,
+        account_key=account_key,
+        amount_field="frmtrm_amount",
+        statement_divisions=statement_divisions,
+        required=False,
     )
 
     return current_amount, previous_amount
@@ -663,3 +530,48 @@ def _to_storage_number(
         return int(value)
 
     return float(value)
+
+
+def _get_account_amount(
+    rows: Iterable[dict[str, Any]],
+    account_key: str,
+    amount_field: str = "thstrm_amount",
+    statement_divisions: tuple[str, ...] | None = None,
+    required: bool = True,
+) -> Decimal | None:
+    """
+    지정한 계정의 금액을 반환한다.
+
+    계정 별칭과 재무제표 구분을 기준으로 행을 찾는다.
+    required=False이면 계정이나 금액이 없어도 None을 반환한다.
+    """
+    aliases = ACCOUNT_ALIASES[account_key]
+
+    row = _find_account_row(
+        statements=rows,
+        aliases=aliases,
+        statement_divisions=statement_divisions,
+    )
+
+    if row is None:
+        if required:
+            alias_text = ", ".join(aliases)
+
+            raise FinancialRatioCalculationError(
+                "필요한 계정을 찾지 못했습니다. "
+                f"계정 후보: {alias_text}"
+            )
+
+        return None
+
+    amount = _parse_amount(
+        row.get(amount_field)
+    )
+
+    if amount is None and required:
+        raise FinancialRatioCalculationError(
+            f"{row.get('account_nm')}의 "
+            f"{amount_field} 값이 없습니다."
+        )
+
+    return amount
