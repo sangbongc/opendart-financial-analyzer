@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dart.financial_ratio_service import (
+from analysis.financial_ratio_service import (
     FinancialRatioCalculationError,
     calculate_and_save_financial_ratios,
     calculate_financial_ratios,
@@ -549,10 +549,10 @@ def test_calculate_financial_ratios_raises_when_statements_empty() -> None:
 
 
 @patch(
-    "dart.financial_ratio_service.upsert_financial_ratios"
+    "analysis.financial_ratio_service.upsert_financial_ratios"
 )
 @patch(
-    "dart.financial_ratio_service.fetch_financial_statements_from_db"
+    "analysis.financial_ratio_service.fetch_financial_statements_from_db"
 )
 def test_calculate_and_save_financial_ratios(
     mock_fetch_financial_statements_from_db: Mock,
@@ -608,10 +608,10 @@ def test_calculate_and_save_financial_ratios(
 
 
 @patch(
-    "dart.financial_ratio_service.upsert_financial_ratios"
+    "analysis.financial_ratio_service.upsert_financial_ratios"
 )
 @patch(
-    "dart.financial_ratio_service.fetch_financial_statements_from_db"
+    "analysis.financial_ratio_service.fetch_financial_statements_from_db"
 )
 def test_calculate_and_save_reports_unavailable_ratios(
     mock_fetch_financial_statements_from_db: Mock,
@@ -654,10 +654,10 @@ def test_calculate_and_save_reports_unavailable_ratios(
 
 
 @patch(
-    "dart.financial_ratio_service.upsert_financial_ratios"
+    "analysis.financial_ratio_service.upsert_financial_ratios"
 )
 @patch(
-    "dart.financial_ratio_service.fetch_financial_statements_from_db"
+    "analysis.financial_ratio_service.fetch_financial_statements_from_db"
 )
 def test_calculate_and_save_raises_when_statement_not_found(
     mock_fetch_financial_statements_from_db: Mock,

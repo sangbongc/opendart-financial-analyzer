@@ -17,7 +17,7 @@ from dart.corporation_service import (
 from dart.financial_statement_service import (
     sync_financial_statements,
 )
-from dart.financial_ratio_service import (
+from analysis.financial_ratio_service import (
     FinancialRatioCalculationError,
     calculate_and_save_financial_ratios,
 )
