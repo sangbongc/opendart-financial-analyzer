@@ -6,6 +6,7 @@ from analysis.account_change_ratio_service import (
     calculate_account_change_ratio,
     calculate_account_change_ratios,
     get_account_change_ratios,
+    get_major_account_change_ratios,
 )
 
 
@@ -184,3 +185,146 @@ def test_get_account_change_ratios_repository_error(
         raise AssertionError(
             "AccountChangeRatioError가 발생해야 합니다."
         )
+    
+
+@patch(
+    "analysis.account_change_ratio_service.get_account_change_ratios"
+)
+def test_get_major_account_change_ratios_filters_accounts(
+    mock_get_change_ratios,
+):
+    mock_get_change_ratios.return_value = [
+        {
+            "account_nm": "매출액",
+            "change_ratio": 10,
+        },
+        {
+            "account_nm": "재고자산",
+            "change_ratio": 20,
+        },
+        {
+            "account_nm": "유형자산",
+            "change_ratio": 30,
+        },
+    ]
+
+    result = get_major_account_change_ratios(
+        corp_code="00126380",
+        bsns_year="2025",
+        major_accounts_by_statement={
+    "IS": [
+        "매출액",
+    ],
+    "BS": [
+        "유형자산",
+    ],
+},
+    )
+
+    assert len(result) == 2
+    assert result[0]["account_nm"] == "매출액"
+    assert result[1]["account_nm"] == "유형자산"
+
+
+@patch(
+    "analysis.account_change_ratio_service.get_account_change_ratios"
+)
+def test_get_major_account_change_ratios_preserves_order(
+    mock_get_change_ratios,
+):
+    mock_get_change_ratios.return_value = [
+        {
+            "account_nm": "유형자산",
+            "change_ratio": 30,
+        },
+        {
+            "account_nm": "매출액",
+            "change_ratio": 10,
+        },
+    ]
+
+    result = get_major_account_change_ratios(
+        corp_code="00126380",
+        bsns_year="2025",
+        major_accounts_by_statement={
+    "IS": [
+        "매출액",
+    ],
+    "BS": [
+        "유형자산",
+    ],
+},
+    )
+
+    assert [row["account_nm"] for row in result] == [
+        "매출액",
+        "유형자산",
+    ]
+
+
+@patch(
+    "analysis.account_change_ratio_service.get_account_change_ratios"
+)
+def test_get_major_account_change_ratios_ignores_unknown_accounts(
+    mock_get_change_ratios,
+):
+    mock_get_change_ratios.return_value = [
+        {
+            "account_nm": "유형자산",
+            "change_ratio": 30,
+        },
+    ]
+
+    result = get_major_account_change_ratios(
+        corp_code="00126380",
+        bsns_year="2025",
+        major_accounts_by_statement={"IS":
+            "매출액",
+        },
+    )
+
+    assert result == []
+
+
+@patch(
+    "analysis.account_change_ratio_service.get_account_change_ratios"
+)
+def test_get_major_account_change_ratios_normalizes_account_names(
+    mock_get_change_ratios,
+):
+    mock_get_change_ratios.return_value = [
+        {
+            "account_nm": "매 출 액",
+            "change_ratio": 10,
+        },
+    ]
+
+    result = get_major_account_change_ratios(
+        corp_code="00126380",
+        bsns_year="2025",
+        major_accounts_by_statement={
+            "IS": [
+                "매출액",
+            ],
+        },
+    )
+
+    assert len(result) == 1
+    assert result[0]["account_nm"] == "매 출 액"
+    assert result[0]["sj_div"] == "IS"
+
+
+@patch(
+    "analysis.account_change_ratio_service.get_account_change_ratios"
+)
+def test_get_major_account_change_ratios_returns_empty_for_empty_major_accounts(
+    mock_get_change_ratios,
+):
+    result = get_major_account_change_ratios(
+        corp_code="00126380",
+        bsns_year="2025",
+        major_accounts_by_statement={},
+    )
+
+    assert result == []
+    mock_get_change_ratios.assert_not_called()

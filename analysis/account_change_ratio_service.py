@@ -7,6 +7,20 @@ from database.financial_statement_repository import (
     fetch_financial_statements_from_db,
 )
 
+major_accounts_by_statement = {
+    "BS": [
+        "매출채권",
+        "재고자산",
+        "유형자산",
+        "자산총계",
+        "부채총계",
+    ],
+    "IS": [
+        "매출액",
+        "영업이익",
+        "당기순이익",
+    ],
+}
 
 class AccountChangeRatioError(Exception):
     """
@@ -205,6 +219,60 @@ def get_combined_account_change_ratios(
     return combined_results
 
 
+def get_major_account_change_ratios(
+    corp_code: str,
+    bsns_year: str,
+    major_accounts_by_statement: dict[str, list[str]],
+    reprt_code: str = "11011",
+    fs_div: str = "CFS",
+) -> list[dict[str, Any]]:
+    """
+    재무제표 종류별 주요 계정의 증감률을 반환한다.
+    """
+    results = []
+
+    for sj_div, major_accounts in major_accounts_by_statement.items():
+        statement_results = get_account_change_ratios(
+            corp_code=corp_code,
+            bsns_year=bsns_year,
+            reprt_code=reprt_code,
+            fs_div=fs_div,
+            sj_div=sj_div,
+        )
+
+        normalized_accounts = {
+            _normalize_account_name(account_name): index
+            for index, account_name in enumerate(major_accounts)
+        }
+
+        filtered_results = []
+
+        for row in statement_results:
+            account_name = str(row.get("account_nm") or "")
+            normalized_name = _normalize_account_name(account_name)
+
+            if normalized_name not in normalized_accounts:
+                continue
+
+            result = dict(row)
+            result["sj_div"] = sj_div
+            result["_major_account_order"] = normalized_accounts[
+                normalized_name
+            ]
+            filtered_results.append(result)
+
+        filtered_results.sort(
+            key=lambda row: row["_major_account_order"]
+        )
+
+        for result in filtered_results:
+            result.pop("_major_account_order", None)
+
+        results.extend(filtered_results)
+
+    return results
+
+
 def _to_decimal(value: Any) -> Decimal | None:
     """
     재무제표 금액을 Decimal로 변환한다.
@@ -244,3 +312,15 @@ def _to_decimal(value: Any) -> Decimal | None:
 
     except InvalidOperation:
         return None
+    
+
+def _normalize_account_name(
+    account_name: str | None,
+) -> str:
+    """
+    계정명 비교를 위해 모든 공백을 제거한다.
+    """
+    if account_name is None:
+        return ""
+
+    return "".join(account_name.split())

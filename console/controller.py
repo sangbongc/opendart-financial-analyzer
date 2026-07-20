@@ -26,8 +26,10 @@ from dart.financial_change_ratio_service import (
 )
 
 from analysis.account_change_ratio_service import (
+    major_accounts_by_statement,
     get_account_change_ratios,
-    get_combined_account_change_ratios
+    get_combined_account_change_ratios,
+    get_major_account_change_ratios,
 )
 from analysis.account_change_analysis import (
     analyze_major_account_changes,
@@ -35,8 +37,7 @@ from analysis.account_change_analysis import (
     analyze_inventory_vs_revenue,
     _normalize_account_name,
     _find_account_result,
-    print_inventory_vs_revenue_analysis,
-
+    print_inventory_vs_revenue_analysis,    
 )
 
 from utils import (
@@ -103,6 +104,9 @@ class ConsoleController:
 
             elif command == "change":
                 self._handle_account_change_ratios()
+            
+            elif command == "major":
+                self._handle_major_account_change_ratios()
 
             elif command in {
                 "exit",
@@ -135,7 +139,8 @@ fs                    기업 재무제표 수집 및 저장
 view                  저장된 재무제표 출력
 ratio                 저장된 재무제표로 재무비율 계산
 ratios                저장된 재무비율 출력
-change                계정별 당기·전기 금액과 증감률을 조회합니다.
+change                계정별 당기·전기 금액과 증감률을 조회
+major                 주요 계정 증감률 계산
 exit                  프로그램 종료
 """
         )
@@ -900,3 +905,114 @@ exit                  프로그램 종료
         print_inventory_vs_revenue_analysis(
             inventory_analysis
         )
+
+
+    def _handle_major_account_change_ratios(self) -> None:
+        """
+        저장된 재무제표를 기반으로 주요 계정 증감률을 계산하고 출력한다.
+        """
+        print()
+        print("[주요 계정 증감률 조회]")
+        print("-" * 60)
+        corporation = self._select_corporation()
+
+        if corporation is None:
+            return
+
+        bsns_year = input(
+            "사업연도를 입력하세요: "
+        ).strip()
+
+        if not bsns_year:
+            print("사업연도를 입력해야 합니다.")
+            return
+
+        reprt_code = "11011"
+
+        fs_div = input(
+            "재무제표 구분을 입력하세요 "
+            "(CFS: 연결, OFS: 별도) [CFS]: "
+        ).strip().upper()
+
+        if not fs_div:
+            fs_div = "CFS"
+        
+        if fs_div not in {"CFS", "OFS"}:
+            print("재무제표 구분은 CFS 또는 OFS만 입력할 수 있습니다.")
+            return
+        
+        try:
+            results = get_major_account_change_ratios(
+                corp_code=corporation["corp_code"],
+                bsns_year=bsns_year,
+                major_accounts_by_statement=(
+                    major_accounts_by_statement
+                ),
+                reprt_code=reprt_code,
+                fs_div=fs_div,
+            )
+
+        except Exception as error:
+            print(
+                "주요 계정 증감률 계산 중 "
+                f"오류가 발생했습니다: {error}"
+            )
+            return
+
+        if not results:
+            print()
+            print("조회된 주요 계정 증감률이 없습니다.")
+            print(
+                "해당 사업연도와 재무제표 구분의 "
+                "저장 데이터를 확인하세요."
+            )
+            return
+
+        print()
+        print(
+            f"기업명: {corporation['corp_name']}"
+        )
+        print(f"사업연도: {bsns_year}")
+        print(f"재무제표 구분: {fs_div}")
+        print("-" * 60)
+
+        statement_names = {
+            "IS": "손익계산서",
+            "BS": "재무상태표",
+        }
+
+        current_sj_div = None
+
+        for row in results:
+            sj_div = row["sj_div"]
+
+            if sj_div != current_sj_div:
+                current_sj_div = sj_div
+
+                print()
+                print(f"[{statement_names.get(sj_div, sj_div)}]")
+                print("-" * 90)
+                print(
+                    f"{pad('계정명', 18)}  "
+                    f"{pad('당기', 22)}  "
+                    f"{pad('전기', 22)}  "
+                    f"{pad('증감률', 10)}"
+                )
+                print("-" * 90)
+
+            account_name = str(row.get("account_nm") or "-")
+            current_amount = format_amount(row.get("current_amount"))
+            previous_amount = format_amount(row.get("previous_amount"))
+
+            change_ratio = row.get("change_ratio")
+            if change_ratio is None:
+                change_ratio_text = "-"
+            else:
+                change_ratio_text = f"{float(change_ratio):+.2f}%"
+
+            print(
+                f"{pad(account_name, 18)}  "
+                f"{pad(current_amount, 22)}  "
+                f"{pad(previous_amount, 22)}  "
+                f"{pad(change_ratio_text, 10)}"
+            )
