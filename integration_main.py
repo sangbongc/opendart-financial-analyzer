@@ -12,10 +12,6 @@ from analysis.financial_ratio_service import (
     calculate_financial_ratios,
 )
 
-from dart.financial_ratio_service import (
-    FinancialRatioCalculationError  as RatioSaveError,
-    calculate_and_save_financial_ratios,
-)
 from wcwidth import wcswidth
 
 from decimal import Decimal, InvalidOperation

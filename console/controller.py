@@ -13,7 +13,9 @@ from console.commands.financial_statement_commands import(
     handle_sync_financial_statements,
     handle_view_financial_statements,
 )
-
+from console.commands.tax_commands import(
+    handle_calculate_effective_tax_rate,
+)
 
 class ConsoleController:
     """
@@ -71,6 +73,9 @@ class ConsoleController:
             
             elif command == "major":
                 handle_major_account_change_ratios()
+            
+            elif command == "etr":
+                handle_calculate_effective_tax_rate()
 
             elif command in {
                 "exit",
@@ -106,6 +111,7 @@ ratio                 저장된 재무제표로 재무비율 계산
 ratios                저장된 재무비율 출력
 change                계정별 당기·전기 금액과 증감률을 조회
 major                 주요 계정 증감률 계산
+etr                   실효세율 계산
 exit                  프로그램 종료
 """
 )
