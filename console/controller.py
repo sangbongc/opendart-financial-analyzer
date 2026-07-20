@@ -1,5 +1,12 @@
 from wcwidth import wcswidth
-
+from console.corporation_selector import(
+    select_corporation
+)
+from console.commands.corporation_commands import (
+    initialize_corporations,
+    handle_sync_corporations,
+    handle_find_corporation
+)
 from database.financial_statement_repository import(
     fetch_financial_statements_from_db
 )
@@ -7,12 +14,10 @@ from database.corporation_repository import (
     count_corporations,
 )
 from database.financial_ratio_repository import fetch_financial_ratios
-
 from dart.corporation_service import (
     CorporationSyncError,
     sync_corporations,
     find_corporations,
-    find_corporations_with_count
 )
 from dart.financial_statement_service import (
     sync_financial_statements,
@@ -24,7 +29,6 @@ from analysis.financial_ratio_service import (
 from dart.financial_change_ratio_service import (
     print_account_change_ratios
 )
-
 from analysis.account_change_ratio_service import (
     major_accounts_by_statement,
     get_account_change_ratios,
@@ -39,7 +43,6 @@ from analysis.account_change_analysis import (
     _find_account_result,
     print_inventory_vs_revenue_analysis,    
 )
-
 from utils import (
     REPORT_CODE_ALIASES,
     REPORT_CODE_NAMES,
@@ -74,7 +77,7 @@ class ConsoleController:
         print("=" * 60)
 
         if self.sync_corporations_on_start:
-            self._initialize_corporations()
+            initialize_corporations()
 
         self._print_help()
 
@@ -85,10 +88,10 @@ class ConsoleController:
                 self._print_help()
 
             elif command == "sync":
-                self._handle_sync_corporations()
+                handle_sync_corporations()
             
             elif command == "find":
-                self._handle_find_corporation()
+                handle_find_corporation()
             
             elif command == "fs":
                 self._handle_sync_financial_statements()
@@ -124,6 +127,7 @@ class ConsoleController:
                     "help를 입력하여 명령어를 확인하세요."
                 )
 
+
     def _print_help(self) -> None:
         """
         사용 가능한 콘솔 명령어를 출력한다.
@@ -145,175 +149,7 @@ exit                  프로그램 종료
 """
         )
 
-    def _handle_sync_corporations(self) -> None:
-        """
-        DART 기업 고유번호 목록을 동기화한다.
-        """
-        print("\nDART 기업 고유번호 동기화를 시작합니다.")
 
-        try:
-            result = sync_corporations()
-
-        except CorporationSyncError as error:
-            print(f"동기화 실패: {error}")
-            return
-
-        except Exception as error:
-            print(
-                "동기화 중 예상하지 못한 오류가 "
-                f"발생했습니다: {error}"
-            )
-            return
-
-        print("\n동기화 완료")
-        print(
-            f"수신 기업 수: "
-            f"{result['received_count']:,}"
-        )
-        print(
-            f"저장 또는 갱신: "
-            f"{result['saved_count']:,}"
-        )
-        print(
-            f"종목코드 보유 기업: "
-            f"{result['listed_count']:,}"
-        )
-        print(
-            f"종목코드 미보유 기업: "
-            f"{result['unlisted_count']:,}"
-        )
-        print(
-            f"비활성화된 기업: "
-            f"{result['deactivated_count']:,}"
-        )
-        print(
-            f"동기화 시각: "
-            f"{result['synced_at']}"
-        )
-    def _initialize_corporations(self) -> None:
-        """
-        기업 정보가 저장되어 있지 않은 경우에만
-        최초 동기화를 수행한다.
-        """
-        corporation_count = count_corporations()
-
-        if corporation_count > 0:
-            print(
-                f"\n저장된 기업 정보 "
-                f"{corporation_count:,}개를 확인했습니다."
-            )
-            print(
-                "기업목록 자동 동기화를 생략합니다."
-            )
-            return
-
-        print("\n저장된 기업 정보가 없습니다.")
-        print("최초 기업목록 동기화를 수행합니다.")
-
-        self._handle_sync_corporations()
-    def _handle_find_corporation(self) -> None:
-        """
-        기업명 또는 종목코드로 기업을 검색하고
-        선택한 기업의 정보를 출력한다.
-        """
-        corporation = self._select_corporation()
-
-        if corporation is None:
-            return
-
-        stock_code = corporation["stock_code"] or "비상장"
-
-        print("\n[선택한 기업]")
-        print("-" * 60)
-        print(f"기업명: {corporation['corp_name']}")
-        print(f"고유번호: {corporation['corp_code']}")
-        print(f"종목코드: {stock_code}")
-        print(
-            f"최근 수정일: "
-            f"{corporation['modify_date'] or '정보 없음'}"
-        )
-    def _select_corporation(self) -> dict | None:
-        """
-        기업명, 종목코드 또는 기업 고유번호를 입력받아
-        검색 결과 중 하나를 선택하도록 한다.
-
-        선택된 기업 정보를 반환하며,
-        검색 또는 선택에 실패하면 None을 반환한다.
-        """
-        keyword = input(
-            "기업명, 종목코드 또는 고유번호를 입력하세요: "
-        ).strip()
-
-        if not keyword:
-            print("검색어를 입력해야 합니다.")
-            return None
-
-        try:
-            result = find_corporations_with_count(
-                keyword=keyword,
-                limit=20,
-                )
-
-        except Exception as error:
-            print(
-                "기업 검색 중 오류가 발생했습니다: "
-                f"{error}"
-            )
-            return None
-        corporations = result["corporations"]
-        total_count = result["total_count"]
-
-        if not corporations:
-            print("검색 결과가 없습니다.")
-            return None
-
-        print("\n[기업 검색 결과]")
-        print("-" * 80)
-
-        for index, corporation in enumerate(
-            corporations,
-            start=1,
-        ):
-            stock_code = (
-                corporation["stock_code"]
-                or "비상장"
-            )
-
-            print(
-                f"{index}. "
-                f"{corporation['corp_name']} "
-                f"/ 종목코드: {stock_code} "
-                f"/ 고유번호: {corporation['corp_code']}"
-            )
-        if total_count > len(corporations):
-            print(
-                f"\n검색 결과 {total_count:,}건 중 "
-                f"{len(corporations):,}건만 표시했습니다."
-            )
-            print("더 구체적인 검색어를 입력해 주세요.")
-
-
-        if len(corporations) == 1:
-            print("\n검색 결과가 1개이므로 자동 선택합니다.")
-            return corporations[0]
-
-        selection = input(
-            "\n선택할 기업 번호를 입력하세요: "
-        ).strip()
-
-        try:
-            selected_index = int(selection) - 1
-
-        except ValueError:
-            print("숫자로 입력해야 합니다.")
-            return None
-
-        if not 0 <= selected_index < len(corporations):
-            print("목록에 있는 번호를 입력하세요.")
-            return None
-
-        return corporations[selected_index]
-    
     def _input_financial_statement_conditions(
         self,
     ) -> dict[str, str]:
@@ -330,12 +166,13 @@ exit                  프로그램 종료
             "fs_div": fs_div,
         }
     
+
     def _handle_sync_financial_statements(self) -> None:
         """
         기업과 보고서 조건을 입력받아
         DART 재무제표를 수집하고 DB에 저장한다.
         """
-        corporation = self._select_corporation()
+        corporation = select_corporation()
 
         if corporation is None:
             return
@@ -381,6 +218,7 @@ exit                  프로그램 종료
 
         print(f"중복 제외: {duplicate_count:,}")
     
+
     def _input_business_year(self) -> str:
         """
         사업연도를 입력받고 4자리 연도인지 검증한다.
@@ -408,6 +246,7 @@ exit                  프로그램 종료
 
             return bsns_year
         
+
     def _input_report_code(self) -> str:
         """
         보고서 코드 또는 별칭을 입력받아 DART 보고서 코드로 반환한다.
@@ -439,6 +278,7 @@ exit                  프로그램 종료
                 "위 목록의 코드 또는 별칭을 입력하세요."
             )
     
+
     def _input_financial_statement_division(self) -> str:
         """
         연결 또는 별도 재무제표 구분을 입력받는다.
@@ -464,12 +304,14 @@ exit                  프로그램 종료
                 "지원하지 않는 재무제표 구분입니다. "
                 "CFS 또는 OFS를 입력하세요."
             )
+
+
     def _handle_calculate_financial_ratios(self) -> None:
         """
         기업과 재무제표 조건을 입력받아
         재무비율을 계산하고 저장한다.
         """
-        corporation = self._select_corporation()
+        corporation = select_corporation()
 
         if corporation is None:
             return
@@ -517,13 +359,15 @@ exit                  프로그램 종료
         print("-" * 60)
         print(f"계산 비율 수: {result['calculated_count']}")
         print(f"저장 또는 갱신: {result['saved_count']}")
+
+
     def _handle_show_financial_ratios(
         self,
     ) -> None:
         """
         저장된 재무비율을 조회하여 출력한다.
         """
-        corporation = self._select_corporation()
+        corporation = select_corporation()
 
         if corporation is None:
             return
@@ -569,6 +413,7 @@ exit                  프로그램 종료
         print("-" * 60)
         print(f"조회 비율 수: {len(ratios)}")
     
+
     @staticmethod
     def _format_ratio(
         value: float | None,
@@ -581,12 +426,13 @@ exit                  프로그램 종료
 
         return f"{value:,.2f}%"
     
+
     def _handle_ratio(self) -> None:
         """
         저장된 재무제표를 이용하여
         재무비율을 계산한다.
         """
-        corporation = self._select_corporation()
+        corporation = select_corporation()
 
         if corporation is None:
             return
@@ -635,6 +481,7 @@ exit                  프로그램 종료
             print("\n계산 불가")
         print(", ".join(result["unavailable_ratios"]))
     
+
     def _handle_view_financial_statements(self) -> None:
         """
         데이터베이스에 저장된 재무제표를 조회하고 출력한다.
@@ -645,7 +492,7 @@ exit                  프로그램 종료
         try:
             # 현재 fs 또는 ratio 명령에서 사용 중인
             # 기업 조회 메서드로 교체하면 된다.
-            corporation = self._select_corporation(
+            corporation = select_corporation(
             )
 
         except Exception as error:
@@ -816,6 +663,8 @@ exit                  프로그램 종료
                 f"총 계정 수: "
                 f"{len(statement_rows):,}개"
             )
+
+
     def _handle_account_change_ratios(self) -> None:
         """
         저장된 재무제표를 기반으로 계정별 증감률을 계산하고 출력한다.
@@ -824,7 +673,7 @@ exit                  프로그램 종료
         print("[계정별 증감률 조회]")
         print("-" * 60)
 
-        corporation = self._select_corporation()
+        corporation = select_corporation()
 
         if corporation is None:
             return
@@ -914,7 +763,7 @@ exit                  프로그램 종료
         print()
         print("[주요 계정 증감률 조회]")
         print("-" * 60)
-        corporation = self._select_corporation()
+        corporation = select_corporation()
 
         if corporation is None:
             return
