@@ -1,11 +1,7 @@
-from console.corporation_selector import(
-    select_corporation
-)
 from console.commands.corporation_commands import (
     initialize_corporations,
     handle_sync_corporations,
     handle_find_corporation,
-    input_financial_statement_conditions,
 )
 from console.commands.financial_ratio_commands import (
     handle_account_change_ratios,
@@ -17,16 +13,7 @@ from console.commands.financial_statement_commands import(
     handle_sync_financial_statements,
     handle_view_financial_statements,
 )
-from database.financial_statement_repository import(
-    fetch_financial_statements_from_db
-)
-from dart.financial_statement_service import (
-    sync_financial_statements,
-)
-from utils import (
-    pad,
-    format_amount,
-)
+
 
 class ConsoleController:
     """
