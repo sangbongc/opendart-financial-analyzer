@@ -15,6 +15,7 @@ from console.commands.financial_statement_commands import(
 )
 from console.commands.tax_commands import(
     handle_calculate_effective_tax_rate,
+    handle_tax_account_changes,
 )
 
 class ConsoleController:
@@ -77,6 +78,9 @@ class ConsoleController:
             elif command == "etr":
                 handle_calculate_effective_tax_rate()
 
+            elif command == "tax-change":
+                handle_tax_account_changes()
+
             elif command in {
                 "exit",
                 "quit",
@@ -112,6 +116,7 @@ ratios                저장된 재무비율 출력
 change                계정별 당기·전기 금액과 증감률을 조회
 major                 주요 계정 증감률 계산
 etr                   실효세율 계산
+tax-change            주요 세무관련 계정 증감 계산
 exit                  프로그램 종료
 """
 )

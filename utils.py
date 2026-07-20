@@ -132,3 +132,39 @@ def get_current_time() -> str:
         sep=" ",
         timespec="seconds",
     )
+
+
+def format_signed_amount(
+    value: object,
+) -> str:
+    """
+    증감액에 증가·감소 부호를 붙여 출력한다.
+    """
+    if value is None:
+        return "-"
+
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    return f"{number:+,}"
+
+
+def format_change_ratio(
+    value: object,
+) -> str:
+    """
+    증감률을 부호와 백분율 형식으로 출력한다.
+    """
+    if value is None:
+        return "계산 불가"
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    return f"{number:+.2f}%"
+
+
