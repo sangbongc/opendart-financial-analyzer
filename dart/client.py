@@ -47,6 +47,7 @@ class DartClient:
 
         return data
 
+
     def get_binary(
         self,
         endpoint: str,
@@ -71,5 +72,27 @@ class DartClient:
                 status="EMPTY_RESPONSE",
                 message="OpenDART 응답 내용이 비어 있습니다.",
             )
+
+        return response.content
+    
+
+    def download(
+        self,
+        endpoint: str,
+        params: dict[str, str],
+    ) -> bytes:
+        """
+        OpenDART API에서 바이너리 파일을 다운로드한다.
+        """
+        response = requests.get(
+            f"{BASE_URL}{endpoint}",
+            params={
+                "crtfc_key": CRTFC_KEY,
+                **params,
+            },
+            timeout=30,
+        )
+
+        response.raise_for_status()
 
         return response.content

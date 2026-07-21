@@ -1,444 +1,355 @@
-from database.schema import create_tables
-from pprint import pprint
+from analysis.xbrl_note_table_parser import (
+    parse_note_table_line_items,
+    _get_concept_id_from_href,
+    _get_presentation_file_name,
+    _get_local_name_from_concept_id,
+    XbrlNoteTableParseError,
+    _find_presentation_link,
+    _find_table_locator_labels,
+    _build_child_map,
+    _build_locator_map,
+    XLINK_NS,
+    LINK_NS,
+    _parse_order,
+    
 
-from dart.financial_statement_service import (
-    sync_financial_statements,
 )
-from database.financial_statement_repository import (
-    fetch_financial_statements_from_db,
+from dart.xbrl_file_service import (
+    download_xbrl_archive,
 )
-from analysis.financial_ratio_service import (
-    FinancialRatioCalculationError,
-    calculate_financial_ratios,
+from zipfile import ZipFile, BadZipFile
+from io import BytesIO
+from xml.etree import ElementTree
+from collections import defaultdict
+TAX_NOTE_CONSOLIDATED_ROLE_URI = (
+    "http://dart.fss.or.kr/role/ifrs/"
+    "ias_12_role-D835110"
 )
 
-from wcwidth import wcswidth
-
-from decimal import Decimal, InvalidOperation
-
-from analysis.account_change_ratio_service import (
-    get_account_change_ratios,
+MAJOR_TAX_COMPONENTS_TABLE = (
+    "MajorComponentsOfTaxExpenseIncomeTable"
 )
-import traceback
 
-def truncate_text(
-    text: str,
-    width: int,
-    suffix: str = "...",
+def get_presentation_concept_type(
+    local_name: str,
 ) -> str:
-    """
-    문자열의 실제 콘솔 표시 폭이 width를 넘으면 잘라낸다.
-    """
-    if wcswidth(text) <= width:
-        return text
+    if local_name.endswith("Table"):
+        return "TABLE"
 
-    suffix_width = wcswidth(suffix)
-    target_width = width - suffix_width
+    if local_name.endswith("Axis"):
+        return "AXIS"
 
-    result = ""
-    current_width = 0
+    if local_name.endswith("Domain"):
+        return "DOMAIN"
 
-    for char in text:
-        char_width = wcswidth(char)
+    if local_name.endswith("Member"):
+        return "MEMBER"
 
-        if char_width < 0:
-            char_width = 0
+    if local_name.endswith("LineItems"):
+        return "LINE_ITEMS"
 
-        if current_width + char_width > target_width:
-            break
+    if local_name.endswith("Abstract"):
+        return "ABSTRACT"
 
-        result += char
-        current_width += char_width
+    if local_name.endswith("Explanatory"):
+        return "EXPLANATORY"
 
-    return result + suffix
+    if local_name.endswith("TextBlock"):
+        return "TEXT_BLOCK"
+
+    return "FACT"
 
 
-def pad(text: str, width: int) -> str:
-    text = truncate_text(text, width)
-    """
-    출력 왼쪽 정렬 기능
-    """
-    return text + " " * max(
-        0,
-        width - wcswidth(text),
+def inspect_table_children(
+    content: bytes,
+    role_uri: str,
+    table_local_name: str,
+) -> None:
+    try:
+        with ZipFile(BytesIO(content)) as archive:
+            presentation_file_name = (
+                _get_presentation_file_name(archive)
+            )
+
+            with archive.open(
+                presentation_file_name
+            ) as file:
+                root = ElementTree.parse(
+                    file
+                ).getroot()
+
+    except BadZipFile as error:
+        raise XbrlNoteTableParseError(
+            "유효한 XBRL ZIP 파일이 아닙니다."
+        ) from error
+
+    presentation_link = (
+        _find_presentation_link(
+            root=root,
+            role_uri=role_uri,
+        )
     )
 
-def pad_right(text: str, width: int) -> str:
-    """
-    한글 등 실제 출력 폭을 고려하여 오른쪽 정렬한다.
-    """
-    text = truncate_text(text, width)
+    locator_map = _build_locator_map(
+        presentation_link
+    )
+    child_map = _build_child_map(
+        presentation_link
+    )
 
-    return " " * max(
-        0,
-        width - wcswidth(text),
-    ) + text
+    table_labels = (
+        _find_table_locator_labels(
+            locator_map=locator_map,
+            table_local_name=(
+                table_local_name
+            ),
+        )
+    )
 
-def format_amount(value: object) -> str:
-    if value is None:
-        return "-"
+    for table_label in table_labels:
+        print()
+        print(f"Table locator: {table_label}")
+        print("-" * 100)
 
-    try:
-        return f"{int(value):,}"
-    except (TypeError, ValueError):
-        return str(value)
+        children = child_map.get(
+            table_label,
+            [],
+        )
 
+        print(f"직접 자식 수: {len(children)}")
 
-def print_financial_statements(
-    rows: list[dict],
-) -> None:
-    if not rows:
-        print("조회된 재무제표가 없습니다.")
-        return
-
-    current_statement_name: str | None = None
-
-    for row in rows:
-        statement_name = row["sj_nm"]
-
-        if statement_name != current_statement_name:
-            current_statement_name = statement_name
-
-            print()
-            print(f"[{statement_name}]")
-            print("-" * 80)
-
-            header_account = pad("계정과목", 40)
+        for order, child_label in children:
+            child = locator_map.get(
+                child_label
+            )
 
             print(
-                f"{header_account}"
-                f"{'당기 금액':>25}"
+                f"order={order} / "
+                f"locator={child_label} / "
+                f"concept={child}"
             )
 
-            print("-" * 80)
 
-        account = pad(
-            str(row["account_nm"]),
-            40,
+def build_parent_map(
+    presentation_link: ElementTree.Element,
+) -> dict[str, list[tuple[float, str]]]:
+    """
+    자식 locator를 기준으로 부모 locator를 조회할 수 있는
+    사전을 만든다.
+    """
+    from_attribute = f"{{{XLINK_NS}}}from"
+    to_attribute = f"{{{XLINK_NS}}}to"
+
+    parent_map: dict[
+        str,
+        list[tuple[float, str]],
+    ] = defaultdict(list)
+
+    for arc in presentation_link.findall(
+        f"{{{LINK_NS}}}presentationArc"
+    ):
+        parent_label = arc.get(
+            from_attribute,
+            "",
+        )
+        child_label = arc.get(
+            to_attribute,
+            "",
         )
 
-        amount = format_amount(
-            row["thstrm_amount"]
+        if not parent_label or not child_label:
+            continue
+
+        order = _parse_order(
+            arc.get("order")
         )
 
-        print(
-            f"{account}"
-            f"{amount:>25}"
+        parent_map[child_label].append(
+            (order, parent_label)
         )
 
-def format_ratio(value: float | None) -> str:
-    if value is None:
-        return "계산 불가"
+    return dict(parent_map)
 
-    return f"{value:,.2f}%"
-
-def print_financial_ratios(
-    result: dict,
+def inspect_table_parent_and_siblings(
+    content: bytes,
+    role_uri: str,
+    table_local_name: str,
 ) -> None:
-    ratios = result["ratios"]
-
-    ratio_names = {
-        "operating_margin": "영업이익률",
-        "net_profit_margin": "순이익률",
-        "roa": "ROA",
-        "roe": "ROE",
-        "debt_ratio": "부채비율",
-        "current_ratio": "유동비율",
-    }
-
-    print()
-    print("[주요 재무비율]")
-    print("-" * 40)
-
-    for key, name in ratio_names.items():
-        print(
-            f"{pad(name, 20)}"
-            f"{format_ratio(ratios[key]):>15}"
-        )
-
-def format_amount(value: object) -> str:
-    """
-    숫자 또는 Decimal 값을 천 단위 구분기호가 포함된 문자열로 변환한다.
-    값이 없거나 숫자로 변환할 수 없으면 '-'를 반환한다.
-    """
-    if value is None:
-        return "-"
-
-    try:
-        amount = Decimal(str(value).replace(",", ""))
-    except (InvalidOperation, ValueError, TypeError):
-        return str(value)
-
-    return f"{amount:,.0f}"
-
-
-def format_ratio(value: object) -> str:
-    """
-    증감률을 소수점 둘째 자리까지 표시한다.
-    전기 금액이 0이어서 계산할 수 없는 경우 '-'를 반환한다.
-    """
-    if value is None:
-        return "-"
-
-    try:
-        ratio = Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError):
-        return str(value)
-
-    return f"{ratio:,.2f}%"
-
-
-def print_account_change_ratios(
-    results: list[dict],
-) -> None:
-    """
-    계정별 증감률 계산 결과를 콘솔에 출력한다.
-    """
-    if not results:
-        print("조회된 계정 증감률 데이터가 없습니다.")
-        return
-
-    formatted_rows = []
-
-    for row in results:
-        formatted_rows.append(
-            {
-                "account_name": row.get("account_nm") or "-",
-                "current_amount": format_amount(
-                    row.get("current_amount")
-                ),
-                "previous_amount": format_amount(
-                    row.get("previous_amount")
-                ),
-                "change_amount": format_amount(
-                    row.get("change_amount")
-                ),
-                "change_ratio": format_ratio(
-                    row.get("change_ratio")
-                ),
-            }
-        )
-
-    name_width = max(
-        28,
-        max(
-            wcswidth(row["account_name"])
-            for row in formatted_rows
-        ) + 2,
-    )
-
-    amount_width = max(
-        20,
-        max(
-            wcswidth(value)
-            for row in formatted_rows
-            for value in (
-                row["current_amount"],
-                row["previous_amount"],
-                row["change_amount"],
+    with ZipFile(BytesIO(content)) as archive:
+        presentation_file_name = (
+            _get_presentation_file_name(
+                archive
             )
-        ) + 3,
-    )
-
-    ratio_width = max(
-        10,
-        max(
-            wcswidth(row["change_ratio"])
-            for row in formatted_rows
-        ) + 3,
-    )
-
-    total_width = (
-        name_width
-        + amount_width * 3
-        + ratio_width
-    )
-
-    print()
-    print("[계정별 증감 분석]")
-    print("-" * total_width)
-
-    print(
-        pad("계정명", name_width)
-        + pad_right("당기 금액", amount_width)
-        + pad_right("전기 금액", amount_width)
-        + pad_right("증감액", amount_width)
-        + pad_right("증감률", ratio_width)
-    )
-
-    print("-" * total_width)
-
-    for row in formatted_rows:
-        print(
-            pad(row["account_name"], name_width)
-            + pad_right(row["current_amount"], amount_width)
-            + pad_right(row["previous_amount"], amount_width)
-            + pad_right(row["change_amount"], amount_width)
-            + pad_right(row["change_ratio"], ratio_width)
         )
 
-    print("-" * total_width)
-    print(f"총 계정 수: {len(results):,}개")
+        with archive.open(
+            presentation_file_name
+        ) as file:
+            root = ElementTree.parse(
+                file
+            ).getroot()
+
+    presentation_link = (
+        _find_presentation_link(
+            root=root,
+            role_uri=role_uri,
+        )
+    )
+
+    locator_map = _build_locator_map(
+        presentation_link
+    )
+    child_map = _build_child_map(
+        presentation_link
+    )
+    parent_map = build_parent_map(
+        presentation_link
+    )
+
+    table_labels = (
+        _find_table_locator_labels(
+            locator_map=locator_map,
+            table_local_name=(
+                table_local_name
+            ),
+        )
+    )
+    print("[법인세비용 구성표]")
+    print("-" * 100)
+
+    for table_label in table_labels:
+        print()
+        print(
+            f"[주석 테이블 구조]"
+        )
+        print("-" * 100)
+
+        table = locator_map[table_label]
+
+        print(
+            f"- [TABLE] "
+            f"{table['local_name']}"
+        )
+
+        parents = parent_map.get(
+            table_label,
+            [],
+        )
+
+        for _, parent_label in parents:
+            siblings = child_map.get(
+                parent_label,
+                [],
+            )
+
+            for order, sibling_label in siblings:
+                sibling = locator_map.get(
+                    sibling_label
+                )
+
+                if sibling is None:
+                    continue
+
+                local_name = sibling[
+                    "local_name"
+                ]
+
+                if sibling_label == table_label:
+                    continue
+
+                if local_name.endswith(
+                    "LineItems"
+                ):
+                    print(
+                        f"- [LINE_ITEMS] "
+                        f"{local_name}"
+                    )
+
+                    for (
+                        child_order,
+                        child_label,
+                    ) in child_map.get(
+                        sibling_label,
+                        [],
+                    ):
+                        child = locator_map.get(
+                            child_label
+                        )
+
+                        if child is None:
+                            continue
+
+                        print(
+                            f"    - [FACT] "
+                            f"{child['local_name']}"
+                        )
+
+    for table_label in table_labels:
+        print()
+        print(
+            f"Table: "
+            f"{locator_map[table_label]}"
+        )
+        print("-" * 100)
+
+        parents = parent_map.get(
+            table_label,
+            [],
+        )
+
+        for _, parent_label in parents:
+            parent = locator_map.get(
+                parent_label
+            )
+
+            print(
+                f"부모: {parent}"
+            )
+
+            print("형제 목록:")
+
+            for order, sibling_label in (
+                child_map.get(
+                    parent_label,
+                    [],
+                )
+            ):
+                sibling = locator_map.get(
+                    sibling_label
+                )
+
+                print(
+                    f"- order={order} / "
+                    f"{sibling}"
+                )
 
 
 def main() -> None:
-    create_tables()
+    content = download_xbrl_archive(
+        rcept_no="20260310002820",
+        reprt_code="11011",
+    )
 
-    ##재무제표 동기화 테스트
-    # result = sync_financial_statements(
-    #     corp_code="00126380",
-    #     bsns_year="2025",
-    # )
+    concepts = parse_note_table_line_items(
+        content=content,
+        role_uri=(
+            TAX_NOTE_CONSOLIDATED_ROLE_URI
+        ),
+        table_local_name=(
+            MAJOR_TAX_COMPONENTS_TABLE
+        ),
+    )
 
-    # print("재무제표 동기화 완료")
-    # print(f"수신 행 수: {result['received_count']:,}")
-    # print(f"저장 행 수: {result['saved_count']:,}")
-    # print(f"중복 제외: {result['ignored_count']:,}")
+    print("[법인세비용 구성표]")
+    print("-" * 100)
 
-    
-    # rows = fetch_financial_statements_from_db(
-    #     corp_code="00126380",
-    #     bsns_year="2025",
-    #     reprt_code="11011",
-    #     fs_div="CFS",
-    # )
+    for concept in concepts:
+        indent = "    " * concept.depth
 
-    # print(f"조회 행 수: {len(rows)}")
-
-    # print_financial_statements(rows)
-
-    ##재무비율 계산 print 테스트
-    # rows = fetch_financial_statements_from_db(
-    #     corp_code="00126380",
-    #     bsns_year="2025",
-    #     reprt_code="11011",
-    #     fs_div="CFS",
-    # )
-
-    # print(f"조회 행 수: {len(rows)}")
-
-    # print_financial_statements(rows)
-
-    # try:
-    #     ratio_result = calculate_financial_ratios(
-    #         rows
-    #     )
-
-    # except FinancialRatioCalculationError as error:
-    #     print()
-    #     print(f"재무비율 계산 실패: {error}")
-
-    # else:
-    #     print_financial_ratios(
-    #         ratio_result
-    #     )
-    
-    ##증감률 출력 테스트
-    corp_code = "00126380"
-    bsns_year = "2024"
-    reprt_code = "11011"
-    fs_div = "CFS"
-    sj_div = "IS"
-
-    print("계정별 증감률을 계산합니다.")
-    print(f"기업 고유번호: {corp_code}")
-    print(f"사업연도: {bsns_year}")
-    print(f"보고서 코드: {reprt_code}")
-    print(f"재무제표 구분: {fs_div}")
-    print(f"재무제표 종류: {sj_div}")
-
-    try:
-        results = get_account_change_ratios(
-            corp_code=corp_code,
-            bsns_year=bsns_year,
-            reprt_code=reprt_code,
-            fs_div=fs_div,
-            sj_div=sj_div,
-        )
-    except Exception as error:
-        print()
         print(
-            "계정별 증감률을 계산하는 중 "
-            f"오류가 발생했습니다: {error}"
+            f"{indent}"
+            f"- {concept.local_name}"
         )
-        traceback.print_exc()
-        return
-
-    print_account_change_ratios(results)
-
-    ##재무비율 저장 테스트
-    # corp_code = "00126380"       # 삼성전자
-    # bsns_year = "2025"
-    # reprt_code = "11011"         # 사업보고서
-    # fs_div = "CFS"               # 연결재무제표
-    # calculation_version = "v2_average_balance"
-
-    # print("재무비율 계산 및 저장을 시작합니다.")
-    # print("-" * 60)
-    # print(f"기업 고유번호: {corp_code}")
-    # print(f"사업연도: {bsns_year}")
-    # print(f"보고서 코드: {reprt_code}")
-    # print(f"재무제표 구분: {fs_div}")
-    # print(f"계산 버전: {calculation_version}")
-
-    # try:
-    #     result = calculate_and_save_financial_ratios(
-    #         corp_code=corp_code,
-    #         bsns_year=bsns_year,
-    #         reprt_code=reprt_code,
-    #         fs_div=fs_div,
-    #         calculation_version=calculation_version,
-    #     )
-
-    # except FinancialRatioCalculationError as error:
-    #     print(f"\n재무비율 계산 실패: {error}")
-    #     return
-
-    # except Exception as error:
-    #     print(f"\n예상하지 못한 오류가 발생했습니다: {error}")
-    #     return
-
-    # print("\n재무비율 계산 및 저장 완료")
-    # print("-" * 60)
-    # print(f"계산 비율 수: {result['calculated_count']}")
-    # print(f"저장 비율 수: {result['saved_count']}")
-
-    # unavailable_ratios = result.get(
-    #     "unavailable_ratios",
-    #     [],
-    # )
-
-    # if unavailable_ratios:
-    #     print(
-    #         "계산 불가 비율: "
-    #         + ", ".join(unavailable_ratios)
-    #     )
-    # else:
-    #     print("계산 불가 비율: 없음")
-
-    # print("\n[계산 결과]")
-
-    # for ratio in result["ratios"]:
-    #     ratio_value = ratio["ratio_value"]
-    #     numerator = ratio["numerator_value"]
-    #     denominator = ratio["denominator_value"]
-
-    #     if ratio_value is None:
-    #         ratio_value_text = "계산 불가"
-    #     else:
-    #         ratio_value_text = f"{ratio_value:,.4f}%"
-
-    #     print("-" * 60)
-    #     print(
-    #         f"{ratio['ratio_name']} "
-    #         f"({ratio['ratio_code']})"
-    #     )
-    #     print(f"비율: {ratio_value_text}")
-    #     print(f"분자: {numerator}")
-    #     print(f"분모: {denominator}")
-
-    # print("\n[전체 결과]")
-    # pprint(result)
 
 
 if __name__ == "__main__":
