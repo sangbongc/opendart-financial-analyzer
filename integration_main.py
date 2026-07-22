@@ -1,5 +1,5 @@
 from analysis.xbrl_note_table_parser import (
-    parse_note_table_line_items,
+    parse_note_table_items,
     _get_concept_id_from_href,
     _get_presentation_file_name,
     _get_local_name_from_concept_id,
@@ -11,16 +11,21 @@ from analysis.xbrl_note_table_parser import (
     XLINK_NS,
     LINK_NS,
     _parse_order,
-    
-
+    select_note_fact,
+    parse_xbrl_label_map,
 )
 from dart.xbrl_file_service import (
     download_xbrl_archive,
+)
+from analysis.income_tax_note_service import (
+    get_major_components_of_tax_expense,
 )
 from zipfile import ZipFile, BadZipFile
 from io import BytesIO
 from xml.etree import ElementTree
 from collections import defaultdict
+
+
 TAX_NOTE_CONSOLIDATED_ROLE_URI = (
     "http://dart.fss.or.kr/role/ifrs/"
     "ias_12_role-D835110"
@@ -330,27 +335,95 @@ def main() -> None:
         reprt_code="11011",
     )
 
-    concepts = parse_note_table_line_items(
+    print("[법인세비용 구성표]")
+    print("-" * 120)
+    results = get_major_components_of_tax_expense(
         content=content,
-        role_uri=(
-            TAX_NOTE_CONSOLIDATED_ROLE_URI
-        ),
-        table_local_name=(
-            MAJOR_TAX_COMPONENTS_TABLE
-        ),
+        bsns_year="2025",
+        fs_div="CFS",
     )
 
-    print("[법인세비용 구성표]")
-    print("-" * 100)
+    for result in results:
+        indent = "    " * result.depth
 
-    for concept in concepts:
-        indent = "    " * concept.depth
+        if result.value is None:
+            formatted_value = "-"
+        else:
+            formatted_value = f"{result.value:,.0f}"
+
+        display_name = (
+            result.label
+            if result.label
+            else result.local_name
+        )
 
         print(
             f"{indent}"
-            f"- {concept.local_name}"
+            f"- {display_name}: "
+            f"{formatted_value}"
         )
+    # for item in items:
+    #     concept = item.concept
+    #     indent = "    " * concept.depth
 
+    #     print(
+    #         f"{indent}"
+    #         f"- {concept.local_name}"
+    #     )
+
+    #     if not item.facts:
+    #         print(
+    #             f"{indent}"
+    #             f"    Fact 없음"
+    #         )
+    #         continue
+
+    #     for fact in item.facts:
+    #         print(
+    #             f"{indent}"
+    #             f"    값={fact.value} / "
+    #             f"context={fact.context_ref} / "
+    #             f"unit={fact.unit_ref} / "
+    #             f"decimals={fact.decimals}"
+    #         )
+    
+    # for item in items:
+    #     concept = item.concept
+    #     indent = "    " * concept.depth
+
+    #     print(
+    #         f"{indent}"
+    #         f"- {concept.local_name}"
+    #     )
+
+    #     for fact in item.facts:
+    #         context = fact.context
+
+    #         if context is None:
+    #             print(
+    #                 f"{indent}"
+    #                 f"    값={fact.value} / "
+    #                 f"context 파싱 실패"
+    #             )
+    #             continue
+
+    #         members = ", ".join(
+    #             context.member_local_names
+    #         )
+
+    #         period = (
+    #             f"{context.start_date}"
+    #             f" ~ {context.end_date}"
+    #             if context.is_duration
+    #             else context.instant_date
+    #         )
+
+    #         print(
+    #             f"{indent}"
+    #             f"    값={fact.value} / "
+    #             f"기간={period} / "
+    #             f"members=[{members}]"
+    #         )
 
 if __name__ == "__main__":
     main()
