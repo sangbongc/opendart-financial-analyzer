@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-
-from analysis.xbrl_note_table_parser import (
+from xbrl.xbrl_label_parser import (
+    parse_xbrl_label_map,
+)
+from xbrl.xbrl_note_table_parser import (
     NoteTableItem,
     XbrlFact,
     parse_note_table_items,
     select_note_fact,
-    parse_xbrl_label_map,
 )
-
 
 # 실제 프로젝트에서 사용 중인 role URI와
 # Table local name으로 교체한다.

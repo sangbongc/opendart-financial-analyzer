@@ -70,7 +70,9 @@ def _make_note_item(
         facts=facts,
     )
 
-
+@patch(
+    "analysis.income_tax_note_service.parse_xbrl_label_map"
+)
 @patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
@@ -80,6 +82,7 @@ def _make_note_item(
 def test_get_major_components_calls_parser(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_parse_xbrl_label_map,
 ) -> None:
     """
     법인세 주석 서비스가 범용 XBRL 파서를
@@ -87,7 +90,11 @@ def test_get_major_components_calls_parser(
     """
     item = _make_note_item()
     selected_fact = _make_fact()
-
+    mock_parse_xbrl_label_map.return_value = {
+        "tax_CurrentTaxExpenseIncome": (
+            "당기법인세비용(수익)"
+        ),
+    }
     mock_parse_note_table_items.return_value = [
         item
     ]
@@ -120,6 +127,9 @@ def test_get_major_components_calls_parser(
 
 
 @patch(
+    "analysis.income_tax_note_service.parse_xbrl_label_map"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -128,6 +138,7 @@ def test_get_major_components_calls_parser(
 def test_select_note_fact_is_called_for_each_item(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_parse_xbrl_label_map,
 ) -> None:
     """
     각 presentation 항목마다 조건에 맞는 Fact를
@@ -183,6 +194,9 @@ def test_select_note_fact_is_called_for_each_item(
 
 
 @patch(
+    "analysis.income_tax_note_service.parse_xbrl_label_map"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -191,6 +205,7 @@ def test_select_note_fact_is_called_for_each_item(
 def test_fact_value_is_converted_to_decimal(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_parse_xbrl_label_map,
 ) -> None:
     """
     선택된 Fact의 문자열 값이 Decimal로
@@ -223,6 +238,9 @@ def test_fact_value_is_converted_to_decimal(
 
 
 @patch(
+    "analysis.income_tax_note_service.parse_xbrl_label_map"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -231,6 +249,7 @@ def test_fact_value_is_converted_to_decimal(
 def test_nil_fact_is_converted_to_none(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_parse_xbrl_label_map,
 ) -> None:
     """
     nil Fact가 숫자로 변환되지 않고 None으로
@@ -258,6 +277,9 @@ def test_nil_fact_is_converted_to_none(
 
 
 @patch(
+    "analysis.income_tax_note_service.parse_xbrl_label_map"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -266,6 +288,7 @@ def test_nil_fact_is_converted_to_none(
 def test_missing_fact_is_converted_to_none(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_parse_xbrl_label_map,
 ) -> None:
     """
     조건에 맞는 Fact가 없을 때 항목은 유지하고
@@ -298,6 +321,9 @@ def test_missing_fact_is_converted_to_none(
 
 
 @patch(
+    "analysis.income_tax_note_service.parse_xbrl_label_map"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -306,6 +332,7 @@ def test_missing_fact_is_converted_to_none(
 def test_presentation_structure_is_preserved(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_parse_xbrl_label_map,
 ) -> None:
     """
     presentation에서 복원한 계층 정보가

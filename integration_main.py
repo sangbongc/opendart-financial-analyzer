@@ -78,68 +78,6 @@ def main() -> None:
             f"- {display_name}: "
             f"{formatted_value}"
         )
-    # for item in items:
-    #     concept = item.concept
-    #     indent = "    " * concept.depth
-
-    #     print(
-    #         f"{indent}"
-    #         f"- {concept.local_name}"
-    #     )
-
-    #     if not item.facts:
-    #         print(
-    #             f"{indent}"
-    #             f"    Fact 없음"
-    #         )
-    #         continue
-
-    #     for fact in item.facts:
-    #         print(
-    #             f"{indent}"
-    #             f"    값={fact.value} / "
-    #             f"context={fact.context_ref} / "
-    #             f"unit={fact.unit_ref} / "
-    #             f"decimals={fact.decimals}"
-    #         )
-    
-    # for item in items:
-    #     concept = item.concept
-    #     indent = "    " * concept.depth
-
-    #     print(
-    #         f"{indent}"
-    #         f"- {concept.local_name}"
-    #     )
-
-    #     for fact in item.facts:
-    #         context = fact.context
-
-    #         if context is None:
-    #             print(
-    #                 f"{indent}"
-    #                 f"    값={fact.value} / "
-    #                 f"context 파싱 실패"
-    #             )
-    #             continue
-
-    #         members = ", ".join(
-    #             context.member_local_names
-    #         )
-
-    #         period = (
-    #             f"{context.start_date}"
-    #             f" ~ {context.end_date}"
-    #             if context.is_duration
-    #             else context.instant_date
-    #         )
-
-    #         print(
-    #             f"{indent}"
-    #             f"    값={fact.value} / "
-    #             f"기간={period} / "
-    #             f"members=[{members}]"
-    #         )
 
 if __name__ == "__main__":
     main()
