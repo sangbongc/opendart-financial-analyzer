@@ -1,5 +1,6 @@
 from analysis.income_tax_note_service import (
     get_major_components_of_tax_expense,
+    get_income_tax_note_by_corporation,
 )
 from dart.xbrl_file_service import (
     download_xbrl_archive,
@@ -46,37 +47,18 @@ def get_presentation_concept_type(
 
 
 def main() -> None:
-    content = download_xbrl_archive(
-        rcept_no="20260310002820",
-        reprt_code="11011",
+    results = get_income_tax_note_by_corporation(
+        corp_code="00126380",
+        bsns_year="2025",
     )
 
     print("[법인세비용 구성표]")
     print("-" * 120)
-    results = get_major_components_of_tax_expense(
-        content=content,
-        bsns_year="2025",
-        fs_div="CFS",
-    )
-
-    for result in results:
-        indent = "    " * result.depth
-
-        if result.value is None:
-            formatted_value = "-"
-        else:
-            formatted_value = f"{result.value:,.0f}"
-
-        display_name = (
-            result.label
-            if result.label
-            else result.local_name
-        )
-
+    for item in results:
         print(
-            f"{indent}"
-            f"- {display_name}: "
-            f"{formatted_value}"
+            item.depth,
+            item.label,
+            item.value,
         )
 
 if __name__ == "__main__":

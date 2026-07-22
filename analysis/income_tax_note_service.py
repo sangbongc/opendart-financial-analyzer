@@ -1,17 +1,25 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+
 from xbrl.xbrl_label_parser import (
     parse_xbrl_label_map,
 )
-from xbrl.xbrl_note_table_parser import (
+from xbrl.xbrl_models import (
     NoteTableItem,
     XbrlFact,
+)
+from xbrl.xbrl_note_table_parser import (
     parse_note_table_items,
     select_note_fact,
 )
+from dart.disclosure_service import (
+    find_financial_report_rcept_no,
+)
+from dart.xbrl_file_service import (
+    download_xbrl_archive,
+)
 
-# 실제 프로젝트에서 사용 중인 role URI와
-# Table local name으로 교체한다.
+
 MAJOR_COMPONENTS_OF_TAX_EXPENSE_ROLE_URI = (
     "http://dart.fss.or.kr/role/ifrs/"
     "ias_12_role-D835110"
@@ -44,6 +52,7 @@ class IncomeTaxNoteValue:
 
     bsns_year: str
     fs_div: str
+
 
 def get_major_components_of_tax_expense(
     content: bytes,
@@ -110,6 +119,38 @@ def get_major_components_of_tax_expense(
     ]
 
 
+def get_income_tax_note_by_corporation(
+    corp_code: str,
+    bsns_year: str,
+    reprt_code: str = "11011",
+    fs_div: str = "CFS",
+) -> list[IncomeTaxNoteValue]:
+    """
+    기업과 사업연도를 기준으로 법인세비용 주석을 조회한다.
+    """
+    rcept_no = find_financial_report_rcept_no(
+        corp_code=corp_code,
+        bsns_year=bsns_year,
+        reprt_code=reprt_code,
+    )
+
+    if rcept_no is None:
+        raise IncomeTaxNoteAnalysisError(
+            "해당 사업연도의 정기보고서를 찾지 못했습니다."
+        )
+
+    content = download_xbrl_archive(
+        rcept_no=rcept_no,
+        reprt_code=reprt_code,
+    )
+
+    return get_major_components_of_tax_expense(
+        content=content,
+        bsns_year=bsns_year,
+        fs_div=fs_div,
+    )
+
+
 def _convert_to_income_tax_note_value(
     item: NoteTableItem,
     label_map: dict[str, str],
@@ -151,6 +192,7 @@ def _convert_to_income_tax_note_value(
         bsns_year=bsns_year,
         fs_div=fs_div,
     )
+
 
 def _get_fact_decimal_value(
     fact: XbrlFact | None,

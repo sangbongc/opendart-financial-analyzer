@@ -17,6 +17,12 @@ from console.commands.tax_commands import(
     handle_calculate_effective_tax_rate,
     handle_tax_account_changes,
 )
+from console.commands.income_tax_note_commands import (
+    handle_income_tax_note,
+)
+from console.corporation_selector import(
+    select_corporation
+)
 
 class ConsoleController:
     """
@@ -81,6 +87,9 @@ class ConsoleController:
             elif command == "tax-change":
                 handle_tax_account_changes()
 
+            elif command == "taxnote":
+                handle_income_tax_note(select_corporation)
+
             elif command in {
                 "exit",
                 "quit",
@@ -117,6 +126,7 @@ change                계정별 당기·전기 금액과 증감률을 조회
 major                 주요 계정 증감률 계산
 etr                   실효세율 계산
 tax-change            주요 세무관련 계정 증감 계산
+taxnote               법인세비용 주석의 주요 구성항목을 조회
 exit                  프로그램 종료
 """
 )
