@@ -6,11 +6,6 @@ from analysis.xbrl_note_table_parser import (
     XbrlFact,
     parse_note_table_items,
     select_note_fact,
-    XBRLDI_NS,
-    LINK_NS,
-    XSI_NS,
-    XLINK_NS,
-    XBRLI_NS,
     parse_xbrl_label_map,
 )
 

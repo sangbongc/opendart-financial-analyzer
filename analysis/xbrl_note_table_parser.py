@@ -143,22 +143,6 @@ class XbrlContext:
         return self.instant_date is not None
     
 
-@dataclass(frozen=True)
-class NoteTableValue:
-    concept_id: str
-    local_name: str
-    label: str | None
-
-    depth: int
-    has_children: bool
-
-    value: int | None
-    unit_ref: str | None
-
-    bsns_year: str
-    fs_div: str
-
-
 def _get_presentation_file_name(
     archive: ZipFile,
 ) -> str:
