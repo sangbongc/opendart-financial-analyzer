@@ -4,3 +4,4 @@ pandas
 lxml
 pytest
 wcwidth
+bs4
