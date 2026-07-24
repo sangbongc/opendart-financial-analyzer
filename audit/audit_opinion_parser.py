@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
@@ -17,6 +18,13 @@ BASIS_HEADING_BY_OPINION_HEADING = {
     "한정의견": "한정의견근거",
     "부적정의견": "부적정의견근거",
     "의견거절": "의견거절근거",
+}
+
+
+MODIFIED_OPINION_HEADINGS = {
+    "한정의견",
+    "부적정의견",
+    "의견거절",
 }
 
 
@@ -109,6 +117,24 @@ IGNORED_PARENT_TAG_NAMES = {
 }
 
 
+REASON_HEADING_PATTERNS = (
+    re.compile(
+        r"^\s*\d+\s*[.)]\s*(?P<title>.+?)\s*$"
+    ),
+    re.compile(
+        r"^\s*\(\s*\d+\s*\)\s*(?P<title>.+?)\s*$"
+    ),
+    re.compile(
+        r"^\s*[가-하]\s*[.)]\s*(?P<title>.+?)\s*$"
+    ),
+)
+
+NUMBERED_REASON_PATTERN = re.compile(
+    r"(?<!\S)(\(\s*\d+\s*\)|\d+\s*[.)])\s*"
+)
+
+
+
 @dataclass(frozen=True)
 class AuditOpinion:
     """
@@ -120,6 +146,7 @@ class AuditOpinion:
     opinion_text: str
     basis_heading: str | None
     opinion_basis_text: str | None
+    basis_reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -142,6 +169,8 @@ class _SectionCandidate:
     unit_index: int
     section_text: str
     score: int
+
+
 
 
 def _normalize_text(text: str) -> str:
@@ -622,6 +651,135 @@ def _build_soup(document_text: str) -> BeautifulSoup:
     return BeautifulSoup(document_text, parser)
 
 
+def _split_paragraphs(
+    text: str,
+) -> list[str]:
+    """
+    의견근거 본문을 비어 있지 않은 문단 단위로 나눈다.
+    """
+    return [
+        _normalize_text(paragraph)
+        for paragraph in re.split(
+            r"\n\s*\n",
+            text,
+        )
+        if _normalize_text(paragraph)
+    ]
+
+
+def _extract_reason_heading(
+    paragraph: str,
+) -> str | None:
+    """
+    번호 또는 항목 기호가 붙은 사유 제목을 추출한다.
+    """
+    normalized = _normalize_text(paragraph)
+
+    for pattern in REASON_HEADING_PATTERNS:
+        match = pattern.match(normalized)
+
+        if match is None:
+            continue
+
+        title = _normalize_text(
+            match.group("title")
+        )
+
+        if title:
+            return title
+
+    return None
+
+def _extract_basis_reasons(
+    opinion_heading: str,
+    basis_text: str | None,
+) -> tuple[str, ...]:
+    """
+    수정의견의 근거 본문을 개별 사유 단위로 분리한다.
+    """
+    if (
+        opinion_heading
+        not in MODIFIED_OPINION_HEADINGS
+    ):
+        return ()
+
+    if not basis_text:
+        return ()
+
+    reasons: list[str] = []
+
+    for block in _split_numbered_reason_blocks(
+        basis_text
+    ):
+        reason = _remove_reason_number(block)
+
+        if reason:
+            reasons.append(reason)
+
+    return tuple(reasons)
+
+
+def _split_numbered_reason_blocks(
+    text: str,
+) -> list[str]:
+    """
+    의견근거 본문에서 번호형 사유 시작 지점을 기준으로
+    개별 사유 블록을 분리한다.
+
+    번호가 문단 중간에 붙어 있어도 인식한다.
+    """
+    normalized = text.strip()
+
+    if not normalized:
+        return []
+
+    matches = list(
+        NUMBERED_REASON_PATTERN.finditer(
+            normalized
+        )
+    )
+
+    if not matches:
+        return [normalized]
+
+    blocks: list[str] = []
+
+    # 첫 번호 앞에 유효한 본문이 있는 경우 보존
+    prefix = normalized[:matches[0].start()].strip()
+
+    if prefix:
+        blocks.append(prefix)
+
+    for index, match in enumerate(matches):
+        start = match.start()
+        end = (
+            matches[index + 1].start()
+            if index + 1 < len(matches)
+            else len(normalized)
+        )
+
+        block = normalized[start:end].strip()
+
+        if block:
+            blocks.append(block)
+
+    return blocks
+
+
+def _remove_reason_number(
+    text: str,
+) -> str:
+    """
+    사유 블록 앞의 번호 표시를 제거한다.
+    """
+    return NUMBERED_REASON_PATTERN.sub(
+        "",
+        text,
+        count=1,
+    ).strip()
+
+
+
 def parse_audit_opinion(
     document_text: str,
 ) -> AuditOpinion:
@@ -676,7 +834,10 @@ def parse_audit_opinion(
             basis_candidate.section_text
             or None
         )
-
+    basis_reasons = _extract_basis_reasons(
+    opinion_heading=opinion_candidate.heading,
+    basis_text=opinion_basis_text,
+)
     return AuditOpinion(
         opinion_type=OPINION_TYPE_BY_HEADING[
             opinion_candidate.heading
@@ -685,4 +846,5 @@ def parse_audit_opinion(
         opinion_text=opinion_candidate.section_text,
         basis_heading=basis_heading,
         opinion_basis_text=opinion_basis_text,
+        basis_reasons=basis_reasons,
     )
