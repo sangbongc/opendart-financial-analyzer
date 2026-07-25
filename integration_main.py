@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date
 from pathlib import Path
-
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 from audit.audit_opinion_parser import parse_audit_opinion
@@ -19,8 +19,17 @@ from dart.audit_report_file_service import (
 from audit.audit_KAM_parser import (
     parse_key_audit_matters,
 )
-from audit.audit_section_parser import (
+from audit.audit_emphasis_parser import (
     parse_emphasis_of_matter,
+)
+from audit.audit_other_matter_parser import (
+    parse_other_matter,
+)
+from audit.audit_going_concern_parser import (
+    parse_going_concern_uncertainty,
+)
+from audit.parser_utils import (
+    extract_document_blocks,
 )
 # False: 별도 감사보고서
 # True: 연결감사보고서
@@ -96,6 +105,8 @@ def _search_period() -> tuple[str, str]:
     today = date.today()
     start_date = f"{today.year - SEARCH_YEARS}0101"
     end_date = today.strftime("%Y%m%d")
+    # start_date="20240101"
+    # end_date="20241231"
     return start_date, end_date
 
 def _split_reason_title_and_body(
@@ -286,14 +297,6 @@ def main() -> None:
             print()
 
     print()
-    print("[통합 테스트 성공]")
-    print("-" * 70)
-    print(
-        "기업 고유번호 입력 → 최신 감사보고서 공시 검색 → "
-        "첨부문서 선택 → 본문 다운로드 → 저장 → "
-        "문서 판별 → 감사의견 파싱 완료"
-    )
-    print()
     print("[7. 핵심감사사항 파싱]")
     print("-" * 70)
     key_audit_matters = parse_key_audit_matters(
@@ -348,7 +351,7 @@ def main() -> None:
     )
 
     print()
-    print("[강조사항]")
+    print("[8. 강조사항]")
     print("-" * 70)
 
     if emphasis is None:
@@ -357,21 +360,46 @@ def main() -> None:
         print(f"제목: {emphasis.heading}")
         print()
         print(emphasis.text)
-    # other_matter = parse_other_matter(
-    #     document.xml_text
-    # )
 
-    # print()
-    # print("[기타사항]")
-    # print("-" * 70)
 
-    # if other_matter is None:
-    #     print("기타사항이 없습니다.")00341916
-    # else:
-    #     print(f"제목: {other_matter.heading}")
-    #     print()
-    #     print(other_matter.text)
+    other_matter = parse_other_matter(
+        document.xml_text
+    )
+    print()
+    print("[9. 기타사항]")
+    print("-" * 70)
 
+    if other_matter is None:
+        print("기타사항이 없습니다.")
+    else:
+        print(
+            f"제목: {other_matter.heading}"
+        )
+        print()
+        print(other_matter.text)
+
+
+    going_concern = (
+        parse_going_concern_uncertainty(
+            document.xml_text
+        )
+    )
+    print()
+    print("[10. 계속기업 관련 중요한 불확실성]")
+    print("-" * 70)
+
+    if going_concern is None:
+        print(
+            "계속기업 관련 중요한 "
+            "불확실성이 없습니다."
+        )
+    else:
+        print(
+            f"제목: {going_concern.heading}"
+        )
+        print()
+        print(going_concern.text)
+        
 
 if __name__ == "__main__":
     try:
