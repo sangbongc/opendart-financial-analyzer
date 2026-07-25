@@ -20,6 +20,9 @@ from console.commands.tax_commands import(
 from console.commands.income_tax_note_commands import (
     handle_income_tax_note,
 )
+from console.commands.audit_commands import(
+    handle_audit_report,
+)
 from console.corporation_selector import(
     select_corporation
 )
@@ -90,6 +93,9 @@ class ConsoleController:
             elif command == "taxnote":
                 handle_income_tax_note(select_corporation)
 
+            elif command == "audit":
+                handle_audit_report(select_corporation)
+
             elif command in {
                 "exit",
                 "quit",
@@ -127,6 +133,7 @@ major                 주요 계정 증감률 계산
 etr                   실효세율 계산
 tax-change            주요 세무관련 계정 증감 계산
 taxnote               법인세비용 주석의 주요 구성항목을 조회
+audit                 감사보고서 조회 및 주요 단락 분석
 exit                  프로그램 종료
 """
 )
