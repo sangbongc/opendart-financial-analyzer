@@ -11,7 +11,7 @@ OpenDART API를 이용하여 기업 기준정보·재무제표·감사보고서�
 계정별 증감액·증감률 계산과 주요 계정 이상징후 탐지
 실효세율 계산, 이연법인세자산·부채 등 세무 관련 계정 변동 조회
 XBRL 원문 파싱을 통한 법인세비용 주석 주요 구성항목 조회
-감사보고서 전문 수집(HTML 뷰어 페이지 순회 방식), 감사의견·근거단락 세부 파싱, 핵심감사사항(KAM) 파싱 (신규, 콘솔 명령 미구현)
+감사보고서 전문 수집(HTML 뷰어 페이지 순회 방식) 및 감사의견·근거단락·강조사항·기타사항·계속기업 관련 중요한 불확실성·핵심감사사항(KAM) 파싱, 종합 조회 콘솔 명령 제공
 명령별 콘솔 처리 모듈 분리 및 CLI 실행
 
 현재 분석은 재무제표 본문과 법인세 주석 등 정형·반정형 데이터를 기반으로 하며, 수치상의 변동은 결론이 아니라 추가 검토가 필요한 영역을 선별하는 자료로 활용합니다. 실제 원인 분석에는 산업 상황, 거래 구조, 회계정책과 재무제표 주석·감사보고서를 함께 검토해야 한다는 것을 전제로 합니다.
@@ -29,10 +29,14 @@ Repository
 Audit Report Parser:보고서 섹션 식별
 Audit Opinion Parser:의견·근거단락 세부화
 Audit KAM Parser:핵심감사사항 추출
+Audit Emphasis Parser:강조사항
+Audit Other Matter Parser:기타사항
+Audit Going ConcernParser: 계속기업 불확실성
 SQLite Database
 Financial Ratio Service
 Account Change Service
 Tax Analysis Service
+Audit Report 종합 조회
 Console CommandModules
 계층별 역할
 계층	역할
@@ -41,7 +45,7 @@ Service	데이터 수집, 동기화, 계산 흐름 관리
 Parser	외부 API 응답(JSON/XML/XBRL) 및 HTML 뷰어 페이지를 내부 저장 형식으로 변환
 Repository	SQLite 저장 및 조회
 Analysis	저장된 데이터를 이용한 재무·세무 분석
-Audit	감사보고서 섹션 식별, 감사의견·근거단락·핵심감사사항 파싱
+Audit	감사보고서 섹션 식별, 감사의견·근거단락·강조사항·기타사항·계속기업 불확실성·핵심감사사항 파싱
 Console	사용자 입력, 기능 호출, 결과 출력
 프로젝트 구조
 text
@@ -55,17 +59,25 @@ opendart-financial-analyzer/
 │   └── income_tax_note_service.py
 │
 ├── audit/
-│   ├── audit_report_parser.py      # 조립된 전문에서 감사보고서 섹션 식별
-│   ├── audit_opinion_parser.py     # 감사의견 종류·본문 및 근거단락 세부 파싱
-│   └── audit_KAM_parser.py         # 핵심감사사항(KAM) 항목별 추출
+│   ├── audit_report_parser.py         # 조립된 전문에서 감사보고서 섹션 식별
+│   ├── audit_opinion_parser.py        # 감사의견 종류·본문 및 근거단락 세부 파싱
+│   ├── audit_KAM_parser.py            # 핵심감사사항(KAM) 항목별 추출
+│   ├── audit_emphasis_parser.py       # 강조사항 파싱
+│   ├── audit_other_matter_parser.py   # 기타사항 파싱
+│   ├── audit_going_concern_parser.py  # 계속기업 관련 중요한 불확실성 파싱
+│   ├── constants.py
+│   ├── models.py
+│   └── parser_utils.py
 │
 ├── console/
 │   ├── controller.py
 │   ├── corporation_selector.py
 │   └── commands/
+│       ├── audit_commands.py           # 감사보고서 종합 조회
 │       ├── corporation_commands.py
 │       ├── financial_statement_commands.py
 │       ├── financial_ratio_commands.py
+│       ├── income_tax_note_commands.py
 │       └── tax_commands.py
 │
 ├── dart/
@@ -92,6 +104,7 @@ opendart-financial-analyzer/
 │   └── xbrl_models.py
 │
 ├── data/
+│   └── audit_reports/    # 수집한 감사보고서 원문 저장
 ├── tests/
 ├── config.py
 ├── main.py
@@ -127,10 +140,8 @@ Phase	내용	상태
 5	계정별 증감액·증감률, 이상징후 탐지	완료
 6	실효세율·이연법인세 변동, XBRL 법인세 주석 파싱	완료
 7	콘솔 명령 구조 분리	완료
-8	감사보고서 전문 수집(HTML 뷰어 순회), 감사의견·근거단락 세부 파싱, 핵심감사사항(KAM) 파싱	로직 구현, 콘솔 명령 미구현
+8	감사보고서 전문 수집(HTML 뷰어 순회), 감사의견·근거단락·강조사항·기타사항·계속기업 관련 중요한 불확실성·핵심감사사항(KAM) 파싱 및 종합 조회 콘솔 명령	완료
 향후 계획
-감사의견·핵심감사사항 조회 기능 콘솔 명령화
-강조사항·계속기업 관련 불확실성 추출
 회계이익-법인세비용 조정표 등 법인세 주석 세부 테이블 확장
 재무제표 계정과 감사보고서 내용 연결
 여러 기업·업종에 걸친 일괄 수집 및 비교 분석
@@ -138,7 +149,7 @@ Phase	내용	상태
 정정공시 반영 자동화
 활용 가능성
 
-기업 재무 상태 기초 분석 · 재무비율·계정 변동 스크리닝 · 실효세율·세무 계정 변동 확인 · 법인세 주석 검토 대상 선별 · 감사보고서 전문 확보 및 감사의견·핵심감사사항 조회 · 회계·감사·세무 데이터 분석 포트폴리오
+기업 재무 상태 기초 분석 · 재무비율·계정 변동 스크리닝 · 실효세율·세무 계정 변동 확인 · 법인세 주석 검토 대상 선별 · 감사보고서 전문 확보 및 감사의견·근거단락·강조사항·기타사항·계속기업 불확실성·핵심감사사항 종합 조회 · 회계·감사·세무 데이터 분석 포트폴리오
 
 주의사항
 학습 및 포트폴리오 목적으로 개발했으며, 투자 권유·세무 자문·회계감사 의견을 의미하지 않습니다.
