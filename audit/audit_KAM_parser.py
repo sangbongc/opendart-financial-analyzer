@@ -1,10 +1,16 @@
 from bs4 import Tag, BeautifulSoup
 import re
+
 from audit.models import (
     KeyAuditMatter,
     KeyAuditMatters,
 )
-
+from audit.parser_utils import (
+    normalize_heading,
+    join_text_blocks,
+    extract_document_blocks,
+    is_bold_element,
+)
 
 KEY_AUDIT_MATTER_HEADINGS = {
     "핵심감사사항",
@@ -30,12 +36,10 @@ KAM_DETAIL_HEADINGS = {
     "감사절차",
 }
 
-def _normalize_heading(text: str) -> str:
-    return "".join(text.split()).strip()
 
 
 def _is_kam_heading(text: str) -> bool:
-    normalized = _normalize_heading(text)
+    normalized = normalize_heading(text)
 
     return normalized.startswith("핵심감사사항")
 
@@ -43,10 +47,10 @@ def _is_kam_heading(text: str) -> bool:
 def _is_kam_section_end_heading(
     text: str,
 ) -> bool:
-    normalized = _normalize_heading(text)
+    normalized = normalize_heading(text)
 
     for heading in KAM_SECTION_END_HEADINGS:
-        normalized_heading = _normalize_heading(
+        normalized_heading = normalize_heading(
             heading
         )
 
@@ -75,11 +79,11 @@ def _find_kam_heading_index(
 def _is_kam_detail_heading(
     text: str,
 ) -> bool:
-    normalized = _normalize_heading(text)
+    normalized = normalize_heading(text)
 
     return any(
         normalized.startswith(
-            _normalize_heading(heading)
+            normalize_heading(heading)
         )
         for heading in KAM_DETAIL_HEADINGS
     )
@@ -103,7 +107,7 @@ def _is_kam_item_heading(
     if len(text) > 120:
         return False
 
-    if _is_bold_element(element):
+    if is_bold_element(element):
         return True
 
     # 번호형 제목 보조 지원
@@ -141,74 +145,6 @@ def _collect_kam_section_elements(
     return section_elements
 
 
-def _is_bold_element(
-    element: Tag,
-) -> bool:
-    if element.name in {
-        "b",
-        "strong",
-    }:
-        return True
-
-    if element.find(
-        ["b", "strong"]
-    ) is not None:
-        return True
-
-    for tag in element.find_all(True):
-        usermark = str(
-            tag.attrs.get(
-                "USERMARK",
-                tag.attrs.get(
-                    "usermark",
-                    "",
-                ),
-            )
-        ).upper()
-
-        if usermark == "B":
-            return True
-
-        style = str(
-            tag.attrs.get(
-                "style",
-                "",
-            )
-        ).lower()
-
-        if (
-            "font-weight:bold" in style
-            or "font-weight: bold" in style
-            or "font-weight:700" in style
-            or "font-weight: 700" in style
-        ):
-            return True
-
-    return False
-
-
-def _normalize_block_text(
-    text: str,
-) -> str:
-    return re.sub(
-        r"[ \t]+",
-        " ",
-        text,
-    ).strip()
-
-
-def _join_text_blocks(
-    blocks: list[str],
-) -> str:
-    cleaned = [
-        _normalize_block_text(block)
-        for block in blocks
-        if _normalize_block_text(block)
-    ]
-
-    return "\n\n".join(cleaned)
-
-
 def _split_kam_items(
     elements: list[Tag],
 ) -> tuple[
@@ -227,7 +163,7 @@ def _split_kam_items(
         nonlocal current_title
         nonlocal current_blocks
 
-        text = _join_text_blocks(
+        text = join_text_blocks(
             current_blocks
         )
 
@@ -269,7 +205,7 @@ def _split_kam_items(
     if found_first_matter:
         flush_current_matter()
 
-    introduction_text = _join_text_blocks(
+    introduction_text = join_text_blocks(
         introduction_blocks
     )
 
@@ -298,7 +234,7 @@ def _build_kam_result(
             matters=matters,
         )
 
-    full_text = _join_text_blocks(
+    full_text = join_text_blocks(
         [
             element.get_text(
                 " ",
@@ -328,47 +264,6 @@ def _build_kam_result(
     )
 
 
-def _extract_document_blocks(
-    soup: BeautifulSoup,
-) -> list[Tag]:
-    """
-    감사보고서 본문을 문서 순서대로 탐색하기 위한
-    대표 블록 요소를 추출한다.
-
-    중첩된 태그가 중복 수집되지 않도록
-    P, TD, DIV 중 최상위 블록만 반환한다.
-    """
-    blocks: list[Tag] = []
-
-    for tag in soup.find_all(
-        ["p", "td", "div"],
-    ):
-        text = tag.get_text(
-            " ",
-            strip=True,
-        )
-
-        if not text:
-            continue
-
-        parent = tag.find_parent(
-            ["p", "td", "div"],
-        )
-
-        if parent is not None:
-            parent_text = parent.get_text(
-                " ",
-                strip=True,
-            )
-
-            if parent_text == text:
-                continue
-
-        blocks.append(tag)
-
-    return blocks
-
-
 def parse_key_audit_matters(
     html: str,
 ) -> KeyAuditMatters | None:
@@ -377,7 +272,7 @@ def parse_key_audit_matters(
         "html.parser",
     )
 
-    elements = _extract_document_blocks(
+    elements = extract_document_blocks(
         soup
     )
 

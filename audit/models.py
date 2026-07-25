@@ -19,3 +19,9 @@ class KeyAuditMatters:
     heading: str
     introduction_text: str | None
     matters: tuple[KeyAuditMatter, ...]
+
+
+@dataclass(frozen=True)
+class AuditReportSection:
+    heading: str
+    text: str

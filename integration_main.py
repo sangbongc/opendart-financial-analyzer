@@ -16,8 +16,11 @@ from dart.audit_report_file_service import (
     select_audit_report_attachment,
     select_latest_audit_report,
 )
-from audit.audit__KAM_parser import (
+from audit.audit_KAM_parser import (
     parse_key_audit_matters,
+)
+from audit.audit_section_parser import (
+    parse_emphasis_of_matter,
 )
 # False: 별도 감사보고서
 # True: 연결감사보고서
@@ -340,6 +343,34 @@ def main() -> None:
                 print()
 
             print(matter.text)
+    emphasis = parse_emphasis_of_matter(
+        document.xml_text
+    )
+
+    print()
+    print("[강조사항]")
+    print("-" * 70)
+
+    if emphasis is None:
+        print("강조사항이 없습니다.")
+    else:
+        print(f"제목: {emphasis.heading}")
+        print()
+        print(emphasis.text)
+    # other_matter = parse_other_matter(
+    #     document.xml_text
+    # )
+
+    # print()
+    # print("[기타사항]")
+    # print("-" * 70)
+
+    # if other_matter is None:
+    #     print("기타사항이 없습니다.")00341916
+    # else:
+    #     print(f"제목: {other_matter.heading}")
+    #     print()
+    #     print(other_matter.text)
 
 
 if __name__ == "__main__":

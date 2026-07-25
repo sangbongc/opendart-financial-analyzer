@@ -137,22 +137,55 @@ def search_audit_reports(
 
         items = list(response.get("list", []))
         for item in items:
-            report_name = str(item.get("report_nm") or "").strip()
-            if not _is_audit_report_submission(report_name):
+            report_name = str(
+                item.get("report_nm") or ""
+            ).strip()
+
+            rcept_date = str(
+                item.get("rcept_dt") or ""
+            )
+            rcept_no = str(
+                item.get("rcept_no") or ""
+            )
+
+            is_audit_report = (
+                _is_audit_report_related_disclosure(
+                    report_name
+                )
+            )
+
+
+            if not is_audit_report:
                 continue
 
             disclosure = AuditReportDisclosure(
-                corp_code=str(item.get("corp_code") or ""),
-                corp_name=str(item.get("corp_name") or ""),
+                corp_code=str(
+                    item.get("corp_code") or ""
+                ),
+                corp_name=str(
+                    item.get("corp_name") or ""
+                ),
                 report_name=report_name,
-                rcept_no=str(item.get("rcept_no") or ""),
-                rcept_date=str(item.get("rcept_dt") or ""),
-                filer_name=str(item.get("flr_nm") or ""),
+                rcept_no=rcept_no,
+                rcept_date=rcept_date,
+                filer_name=str(
+                    item.get("flr_nm") or ""
+                ),
             )
-            results[disclosure.rcept_no] = disclosure
 
-        if not items or page_no >= to_int(response.get("total_page"), 1):
+            results[
+                disclosure.rcept_no
+            ] = disclosure
+
+        if (
+            not items
+            or page_no >= to_int(
+                response.get("total_page"),
+                1,
+            )
+        ):
             break
+
         page_no += 1
 
     return sorted(
@@ -457,22 +490,19 @@ def _extract_attachment_candidates(
     return candidates
 
 
-def _is_audit_report_submission(report_name: str) -> bool:
-    normalized = "".join(report_name.split())
-    excluded = (
-        "감사전재무제표",
-        "회계법인사업보고서",
-        "사업보고서",
-        "반기보고서",
-        "분기보고서",
-        "내부회계관리제도",
-        "감사보고서제출기한연장",
-    )
-    return (
-        "감사보고서" in normalized
-        and not any(keyword in normalized for keyword in excluded)
+def _is_audit_report_related_disclosure(
+    report_name: str,
+) -> bool:
+    normalized = re.sub(
+        r"\s+",
+        "",
+        report_name,
     )
 
+    return (
+        "감사보고서" in normalized
+        or "사업보고서" in normalized
+    )
 
 def _is_audit_report_title(title: str) -> bool:
     normalized = "".join(html.unescape(title).split())
