@@ -21,18 +21,39 @@ BASIS_HEADING_BY_OPINION_HEADING = {
 }
 
 
-MODIFIED_OPINION_HEADINGS = {
+MODIFIED_OPINION_TYPES = {
     "한정의견",
     "부적정의견",
     "의견거절",
 }
 
 
+OPINION_TYPE_BY_BASIS_HEADING = {
+    "감사의견근거": "적정의견",
+    "한정의견근거": "한정의견",
+    "부적정의견근거": "부적정의견",
+    "의견거절근거": "의견거절",
+}
+
+
 HEADING_ALIASES = {
+    # "의"가 포함된 표기
     "감사의견의 근거": "감사의견근거",
     "한정의견의 근거": "한정의견근거",
     "부적정의견의 근거": "부적정의견근거",
     "의견거절의 근거": "의견거절근거",
+
+    # DART 보고서에서 자주 나타나는 띄어쓰기 표기
+    "감사의견 근거": "감사의견근거",
+    "한정의견 근거": "한정의견근거",
+    "부적정의견 근거": "부적정의견근거",
+    "의견거절 근거": "의견거절근거",
+
+    # 드물게 의견 명칭 내부까지 띄어 쓴 표기
+    "감사 의견 근거": "감사의견근거",
+    "한정 의견 근거": "한정의견근거",
+    "부적정 의견 근거": "부적정의견근거",
+    "의견 거절 근거": "의견거절근거",
 }
 
 
@@ -502,21 +523,25 @@ def _score_opinion_text(
     return score
 
 
-def _has_expected_basis_after(
+def _has_basis_after(
     units: list[_TextUnit],
-    heading: str,
     heading_index: int,
 ) -> bool:
     """
-    현재 의견 후보 뒤에 대응하는 의견근거 제목이 존재하는지
-    확인한다. 다음 감사의견 후보를 만나면 탐색을 중단한다.
+    현재 의견 후보 뒤에 어떤 형태든 의견근거 제목이 있는지
+    확인한다.
+
+    일부 감사보고서는 의견 단락 제목을 단순히 '감사의견'으로
+    작성하면서 실제 근거 제목은 '의견거절근거' 등으로 표시한다.
+    따라서 의견 제목과 근거 제목이 반드시 대응한다고 가정하지
+    않는다.
     """
-    expected_heading = (
-        BASIS_HEADING_BY_OPINION_HEADING[heading]
+    basis_headings = set(
+        OPINION_TYPE_BY_BASIS_HEADING
     )
 
     for unit in units[heading_index + 1:]:
-        if unit.heading == expected_heading:
+        if unit.heading in basis_headings:
             return True
 
         if unit.heading in OPINION_TYPE_BY_HEADING:
@@ -542,9 +567,8 @@ def _find_best_opinion_candidate(
             heading_index=index,
         )
 
-        has_basis = _has_expected_basis_after(
+        has_basis = _has_basis_after(
             units=units,
-            heading=unit.heading,
             heading_index=index,
         )
 
@@ -578,12 +602,13 @@ def _find_basis_candidate(
     opinion_candidate: _SectionCandidate,
 ) -> _SectionCandidate | None:
     """
-    선택된 의견 단락 뒤에서 대응하는 의견근거를 찾는다.
+    선택된 의견 단락 뒤에서 가장 먼저 나오는 의견근거를 찾는다.
+
+    의견 제목이 '감사의견'이어도 실제 근거 제목은
+    '한정의견근거', '부적정의견근거', '의견거절근거'일 수 있다.
     """
-    expected_heading = (
-        BASIS_HEADING_BY_OPINION_HEADING[
-            opinion_candidate.heading
-        ]
+    basis_headings = set(
+        OPINION_TYPE_BY_BASIS_HEADING
     )
 
     for index in range(
@@ -592,7 +617,10 @@ def _find_basis_candidate(
     ):
         unit = units[index]
 
-        if unit.heading != expected_heading:
+        if unit.heading in OPINION_TYPE_BY_HEADING:
+            break
+
+        if unit.heading not in basis_headings:
             continue
 
         section_text = _extract_section_text(
@@ -601,7 +629,7 @@ def _find_basis_candidate(
         )
 
         return _SectionCandidate(
-            heading=expected_heading,
+            heading=unit.heading,
             unit_index=index,
             section_text=section_text,
             score=0,
@@ -609,6 +637,73 @@ def _find_basis_candidate(
 
     return None
 
+
+def _determine_opinion_type(
+    opinion_heading: str,
+    opinion_text: str,
+    basis_heading: str | None,
+) -> str:
+    """
+    감사의견 제목, 의견 본문 및 근거 제목을 함께 사용하여
+    실제 감사의견 유형을 판정한다.
+
+    판정 우선순위는 다음과 같다.
+    1. 수정의견이 명시된 의견 제목
+    2. 의견근거 제목
+    3. 의견 본문의 강한 고유 문구
+    4. 그 밖의 경우 적정의견
+    """
+    if opinion_heading in MODIFIED_OPINION_TYPES:
+        return opinion_heading
+
+    if basis_heading in OPINION_TYPE_BY_BASIS_HEADING:
+        basis_type = OPINION_TYPE_BY_BASIS_HEADING[
+            basis_heading
+        ]
+
+        if basis_type != "적정의견":
+            return basis_type
+
+    normalized_text = _normalize_text(
+        opinion_text
+    )
+
+    disclaimer_phrases = (
+        "감사의견을 표명하지 않습니다",
+        "의견을 표명하지 않습니다",
+        "감사의견을 표명할 수 없습니다",
+        "의견을 표명할 수 없습니다",
+    )
+
+    adverse_phrases = (
+        "공정하게 표시하고 있지 않습니다",
+        "적정하게 표시하고 있지 않습니다",
+    )
+
+    qualified_phrases = (
+        "영향을 제외하고는",
+        "가능한 영향을 제외하고는",
+    )
+
+    if any(
+        phrase in normalized_text
+        for phrase in disclaimer_phrases
+    ):
+        return "의견거절"
+
+    if any(
+        phrase in normalized_text
+        for phrase in adverse_phrases
+    ):
+        return "부적정의견"
+
+    if any(
+        phrase in normalized_text
+        for phrase in qualified_phrases
+    ):
+        return "한정의견"
+
+    return "적정의견"
 
 def _looks_like_full_audit_report(
     soup: BeautifulSoup,
@@ -691,15 +786,15 @@ def _extract_reason_heading(
     return None
 
 def _extract_basis_reasons(
-    opinion_heading: str,
+    opinion_type: str,
     basis_text: str | None,
 ) -> tuple[str, ...]:
     """
     수정의견의 근거 본문을 개별 사유 단위로 분리한다.
     """
     if (
-        opinion_heading
-        not in MODIFIED_OPINION_HEADINGS
+        opinion_type
+        not in MODIFIED_OPINION_TYPES
     ):
         return ()
 
@@ -834,14 +929,19 @@ def parse_audit_opinion(
             basis_candidate.section_text
             or None
         )
+    opinion_type = _determine_opinion_type(
+        opinion_heading=opinion_candidate.heading,
+        opinion_text=opinion_candidate.section_text,
+        basis_heading=basis_heading,
+    )
+
     basis_reasons = _extract_basis_reasons(
-    opinion_heading=opinion_candidate.heading,
-    basis_text=opinion_basis_text,
-)
+        opinion_type=opinion_type,
+        basis_text=opinion_basis_text,
+    )
+
     return AuditOpinion(
-        opinion_type=OPINION_TYPE_BY_HEADING[
-            opinion_candidate.heading
-        ],
+        opinion_type=opinion_type,
         heading=opinion_candidate.heading,
         opinion_text=opinion_candidate.section_text,
         basis_heading=basis_heading,

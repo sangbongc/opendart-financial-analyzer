@@ -275,7 +275,6 @@ def main() -> None:
         print(opinion.opinion_basis_text or "-")
     else:
         print()
-        print("감사의견 근거 단락: 없음")
     if opinion.basis_reasons:
         print()
         print("[감사의견 근거 세부 사유]")
