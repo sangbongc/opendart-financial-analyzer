@@ -1,5 +1,6 @@
 import sqlite3
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -27,10 +28,25 @@ def temporary_database(
 
         return connection
 
+    @contextmanager
+    def test_database_connection():
+        connection = get_test_connection()
+
+        try:
+            yield connection
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
+
     monkeypatch.setattr(
         repository,
-        "get_connection",
-        get_test_connection,
+        "database_connection",
+        test_database_connection,
     )
 
     connection = get_test_connection()
@@ -403,4 +419,3 @@ def test_delete_financial_ratios_deletes_only_selected_version(
         remaining_rows[0]["calculation_version"]
         == "v2_average_balance"
     )
-

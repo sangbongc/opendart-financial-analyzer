@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -23,16 +24,31 @@ def test_database(
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    @contextmanager
+    def test_database_connection():
+        connection = get_test_connection()
+
+        try:
+            yield connection
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
+
     monkeypatch.setattr(
         schema,
-        "get_connection",
-        get_test_connection,
+        "database_connection",
+        test_database_connection,
     )
 
     monkeypatch.setattr(
         financial_statement_repository,
-        "get_connection",
-        get_test_connection,
+        "database_connection",
+        test_database_connection,
     )
 
     schema.create_tables()
