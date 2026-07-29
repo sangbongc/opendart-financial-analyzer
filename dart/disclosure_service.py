@@ -9,11 +9,23 @@ class DisclosureSearchError(Exception):
     """
 
 
-REPORT_NAMES = {
-    "11011": "사업보고서",
-    "11012": "반기보고서",
-    "11013": "분기보고서",
-    "11014": "분기보고서",
+REPORT_INFO = {
+    "11011": {
+        "report_name": "사업보고서",
+        "report_month": "12",
+    },
+    "11012": {
+        "report_name": "반기보고서",
+        "report_month": "06",
+    },
+    "11013": {
+        "report_name": "분기보고서",
+        "report_month": "03",
+    },
+    "11014": {
+        "report_name": "분기보고서",
+        "report_month": "09",
+    },
 }
 
 
@@ -36,7 +48,7 @@ def find_financial_report_rcept_no(
             "사업연도를 입력해야 합니다."
         )
 
-    if reprt_code not in REPORT_NAMES:
+    if reprt_code not in REPORT_INFO:
         raise ValueError(
             f"지원하지 않는 보고서 코드입니다: {reprt_code}"
         )
@@ -75,8 +87,6 @@ def find_financial_report_rcept_no(
             f"공시 목록 조회 오류: {message}"
         )
 
-    report_name = REPORT_NAMES[reprt_code]
-
     disclosures = response.get("list", [])
 
     matched_disclosures = [
@@ -85,7 +95,7 @@ def find_financial_report_rcept_no(
         if _matches_financial_report(
             item=item,
             bsns_year=bsns_year,
-            report_name=report_name,
+            reprt_code=reprt_code,
         )
     ]
 
@@ -110,17 +120,26 @@ def find_financial_report_rcept_no(
 def _matches_financial_report(
     item: dict[str, Any],
     bsns_year: str,
-    report_name: str,
+    reprt_code: str,
 ) -> bool:
     """
-    조회된 공시가 요청한 사업연도의 정기보고서인지 확인한다.
+    조회된 공시가 요청한 사업연도와 보고서 코드에
+    해당하는 정기보고서인지 확인한다.
     """
+    report_info = REPORT_INFO.get(reprt_code)
+
+    if report_info is None:
+        raise ValueError(
+            f"지원하지 않는 보고서 코드입니다: {reprt_code}"
+        )
+
     report_nm = str(
         item.get("report_nm") or ""
     ).replace(" ", "")
 
     expected_name = (
-        f"{report_name}({bsns_year}.12)"
+        f"{report_info['report_name']}"
+        f"({bsns_year}.{report_info['report_month']})"
         .replace(" ", "")
     )
 

@@ -3,6 +3,7 @@ from zipfile import BadZipFile, ZipFile
 
 from dart.client import DartClient
 from dart.disclosure_service import (
+    REPORT_INFO,
     find_financial_report_rcept_no,
 )
 
@@ -59,6 +60,11 @@ def download_xbrl_archive(
     if not reprt_code.strip():
         raise ValueError(
             "보고서 코드를 입력해야 합니다."
+        )
+
+    if reprt_code not in REPORT_INFO:
+        raise ValueError(
+            f"지원하지 않는 보고서 코드입니다: {reprt_code}"
         )
 
     client = DartClient()
@@ -159,7 +165,7 @@ def _is_zip_archive(content: bytes) -> bool:
 
     except BadZipFile:
         return False
-    
+
 
 def download_xbrl_archive_by_report(
     corp_code: str,
@@ -177,8 +183,15 @@ def download_xbrl_archive_by_report(
     )
 
     if rcept_no is None:
+        report_info = REPORT_INFO[reprt_code]
+        expected_report = (
+            f"{report_info['report_name']}"
+            f"({bsns_year}.{report_info['report_month']})"
+        )
+
         raise XbrlFileDownloadError(
-            "조건에 해당하는 정기공시를 찾을 수 없습니다."
+            "조건에 해당하는 정기공시를 찾을 수 없습니다: "
+            f"{expected_report}"
         )
 
     return download_xbrl_archive(
