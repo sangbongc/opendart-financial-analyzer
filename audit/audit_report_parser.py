@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 
 class AuditReportDocumentType(Enum):
@@ -90,47 +90,6 @@ def _detect_document_type(
     return AuditReportDocumentType.UNKNOWN
 
 
-def _has_audit_section(
-    soup: BeautifulSoup,
-) -> bool:
-    for title in soup.find_all(
-        lambda tag: (
-            isinstance(tag, Tag)
-            and tag.name.lower() == "title"
-        )
-    ):
-        normalized_text = _normalize_text(
-            title.get_text(" ", strip=True)
-        )
-
-        if any(
-            _normalize_text(heading)
-            in normalized_text
-            for heading in AUDIT_SECTION_HEADINGS
-        ):
-            return True
-
-    has_opinion_field = soup.find(
-        lambda tag: (
-            isinstance(tag, Tag)
-            and (
-                str(
-                    tag.get("ACODE")
-                    or tag.get("acode")
-                    or ""
-                ).startswith("OPN_")
-                or str(
-                    tag.get("AUNIT")
-                    or tag.get("aunit")
-                    or ""
-                ).startswith("OPN_")
-            )
-        )
-    )
-
-    return has_opinion_field is not None
-
-
 def _looks_like_full_audit_report(
     soup: BeautifulSoup,
 ) -> bool:
@@ -150,108 +109,6 @@ def _looks_like_full_audit_report(
     return (
         has_responsibility_section
         and has_opinion_section
-    )
-
-
-def _find_tag_case_insensitive(
-    soup: BeautifulSoup,
-    tag_name: str,
-) -> Tag | None:
-    return soup.find(
-        lambda tag: (
-            isinstance(tag, Tag)
-            and tag.name.lower() == tag_name.lower()
-        )
-    )
-
-
-def parse_audit_report_document(
-    xml_text: str,
-) -> AuditReportDocument:
-    """
-    원본 DART XML의 문서 메타데이터와 문서 유형을 판별한다.
-    """
-    if not xml_text.strip():
-        raise ValueError(
-            "공시 XML 내용이 비어 있습니다."
-        )
-
-    soup = BeautifulSoup(
-        xml_text,
-        "xml",
-    )
-
-    document_name_tag = _find_tag_case_insensitive(
-        soup,
-        "DOCUMENT-NAME",
-    )
-    company_name_tag = _find_tag_case_insensitive(
-        soup,
-        "COMPANY-NAME",
-    )
-
-    if document_name_tag is None:
-        raise ValueError(
-            "DOCUMENT-NAME 태그를 찾을 수 없습니다."
-        )
-
-    if company_name_tag is None:
-        raise ValueError(
-            "COMPANY-NAME 태그를 찾을 수 없습니다."
-        )
-
-    document_code = (
-        document_name_tag.get("ACODE")
-        or document_name_tag.get("acode")
-    )
-
-    if not document_code:
-        raise ValueError(
-            "DOCUMENT-NAME의 ACODE를 찾을 수 없습니다."
-        )
-
-    document_name = document_name_tag.get_text(
-        " ",
-        strip=True,
-    )
-    company_name = company_name_tag.get_text(
-        " ",
-        strip=True,
-    )
-    company_code = (
-        company_name_tag.get("AREGCIK")
-        or company_name_tag.get("aregcik")
-    )
-
-    document_type = _detect_document_type(
-        document_name,
-    )
-
-    if (
-        document_type
-        is AuditReportDocumentType.AUDIT_REPORT
-        and not _looks_like_full_audit_report(soup)
-    ):
-        document_type = AuditReportDocumentType.UNKNOWN
-
-    if (
-        document_type
-        is AuditReportDocumentType.BUSINESS_REPORT
-        and not _has_audit_section(soup)
-    ):
-        document_type = AuditReportDocumentType.UNKNOWN
-
-    return AuditReportDocument(
-        document_code=str(document_code),
-        document_name=document_name,
-        document_type=document_type,
-        company_name=company_name,
-        company_code=(
-            str(company_code)
-            if company_code
-            else None
-        ),
-        xml_text=xml_text,
     )
 
 
