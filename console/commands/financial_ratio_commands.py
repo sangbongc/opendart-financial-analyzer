@@ -35,6 +35,7 @@ from utils import (
     pad,
     pad_right,
     format_amount,
+    format_ratio,
 )
 
 
@@ -143,19 +144,6 @@ def handle_show_financial_ratios() -> None:
         print("-" * 60)
         print(f"조회 비율 수: {len(ratios)}")
     
-
-@staticmethod
-def format_ratio(
-    value: float | None,
-    ) -> str:
-        """
-        계산된 재무비율을 출력용 문자열로 변환한다.
-        """
-        if value is None:
-            return "계산 불가"
-
-        return f"{value:,.2f}%"
-
 
 def handle_account_change_ratios() -> None:
         """

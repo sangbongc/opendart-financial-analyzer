@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from config import DB_PATH
 
@@ -24,3 +26,25 @@ def get_connection() -> sqlite3.Connection:
     connection.execute("PRAGMA foreign_keys = ON")
 
     return connection
+
+@contextmanager
+def database_connection() -> Iterator[sqlite3.Connection]:
+    """
+    SQLite 연결과 트랜잭션 생명주기를 관리한다.
+
+    - 정상 종료 시 커밋한다.
+    - 예외 발생 시 롤백한 뒤 예외를 다시 전달한다.
+    - 성공 여부와 관계없이 연결을 닫는다.
+    """
+    connection = get_connection()
+
+    try:
+        yield connection
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()

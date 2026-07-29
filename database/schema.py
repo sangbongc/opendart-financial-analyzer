@@ -1,6 +1,6 @@
 import sqlite3
 
-from database.connection import get_connection
+from database.connection import database_connection
 
 
 def create_corporations_table(
@@ -239,18 +239,7 @@ def create_tables() -> None:
     하나의 데이터베이스 연결과 트랜잭션 안에서
     전체 테이블 생성 작업을 수행한다.
     """
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         create_corporations_table(connection)
         create_financial_statement_tables(connection)
         create_financial_ratio_tables(connection)
-                
-        connection.commit()
-
-    except Exception:
-        connection.rollback()
-        raise
-
-    finally:
-        connection.close()

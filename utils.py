@@ -39,6 +39,8 @@ FS_DIV_ALIASES = {
     "개별": "OFS",
     "별도재무제표": "OFS",
 }
+
+
 def truncate_text(
     text: str,
     width: int,
@@ -70,15 +72,17 @@ def truncate_text(
 
     return result + suffix
 
+
 def pad(text: str, width: int) -> str:
-    text = truncate_text(text, width)
     """
     출력 왼쪽 정렬 기능
     """
+    text = truncate_text(text, width)
     return text + " " * max(
         0,
         width - wcswidth(text),
     )
+
 
 def pad_right(text: str, width: int) -> str:
     """
@@ -158,7 +162,7 @@ def format_change_ratio(
     증감률을 부호와 백분율 형식으로 출력한다.
     """
     if value is None:
-        return "계산 불가"
+        return "-"
 
     try:
         number = float(value)

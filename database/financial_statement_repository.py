@@ -1,8 +1,7 @@
 from collections.abc import Iterable
 from typing import Any
 
-from database.connection import get_connection
-
+from database.connection import database_connection
 
 
 def save_financial_statements(
@@ -24,9 +23,7 @@ def save_financial_statements(
     if not records:
         return 0
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         before_changes = connection.total_changes
 
         connection.executemany(
@@ -66,12 +63,7 @@ def save_financial_statements(
             records,
         )
 
-        connection.commit()
-
         return connection.total_changes - before_changes
-
-    finally:
-        connection.close()
 
 
 def fetch_financial_statements_from_db(
@@ -150,9 +142,7 @@ def fetch_financial_statements_from_db(
             id
     """
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         rows = connection.execute(
             query,
             parameters,
@@ -162,9 +152,6 @@ def fetch_financial_statements_from_db(
             dict(row)
             for row in rows
         ]
-
-    finally:
-        connection.close()
 
 
 def fetch_financial_statement_accounts(
@@ -205,9 +192,7 @@ def fetch_financial_statement_accounts(
             "account_name은 비어 있을 수 없습니다."
         )
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         rows = connection.execute(
             """
             SELECT
@@ -262,9 +247,6 @@ def fetch_financial_statement_accounts(
             for row in rows
         ]
 
-    finally:
-        connection.close()
-
 
 def count_financial_statements(
     corp_code: str | None = None,
@@ -274,9 +256,7 @@ def count_financial_statements(
 
     corp_code가 주어지면 해당 기업의 행 수만 계산한다.
     """
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         if corp_code is None:
             row = connection.execute(
                 """
@@ -296,9 +276,6 @@ def count_financial_statements(
             ).fetchone()
 
         return int(row["count"])
-
-    finally:
-        connection.close()
 
 
 def _normalize_financial_statement(

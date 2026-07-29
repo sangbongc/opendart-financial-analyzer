@@ -1,10 +1,6 @@
 from collections.abc import Iterable
-from datetime import datetime
 from utils import get_current_time
-from database.connection import get_connection
-
-
-
+from database.connection import database_connection
 
 
 def upsert_corporation(
@@ -29,9 +25,7 @@ def upsert_corporation(
 
     current_time = seen_at or get_current_time()
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         connection.execute(
             """
             INSERT INTO dart_corporations (
@@ -63,11 +57,6 @@ def upsert_corporation(
                 current_time,
             ),
         )
-
-        connection.commit()
-
-    finally:
-        connection.close()
 
 
 def upsert_corporations(
@@ -107,9 +96,7 @@ def upsert_corporations(
     if not records:
         return 0
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         connection.executemany(
             """
             INSERT INTO dart_corporations (
@@ -135,12 +122,7 @@ def upsert_corporations(
             records,
         )
 
-        connection.commit()
-
         return len(records)
-
-    finally:
-        connection.close()
 
 
 def fetch_corporation_by_corp_code(
@@ -149,9 +131,7 @@ def fetch_corporation_by_corp_code(
     """
     DART 기업 고유번호로 기업 정보를 조회한다.
     """
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         row = connection.execute(
             """
             SELECT
@@ -174,9 +154,6 @@ def fetch_corporation_by_corp_code(
 
         return dict(row)
 
-    finally:
-        connection.close()
-
 
 def fetch_corporation_by_stock_code(
     stock_code: str,
@@ -185,9 +162,7 @@ def fetch_corporation_by_stock_code(
     """
     주식 종목코드로 DART 기업 정보를 조회한다.
     """
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         query = """
             SELECT
                 corp_code,
@@ -217,9 +192,6 @@ def fetch_corporation_by_stock_code(
 
         return dict(row)
 
-    finally:
-        connection.close()
-
 
 def deactivate_missing_corporations(
     active_corp_codes: Iterable[str],
@@ -233,9 +205,7 @@ def deactivate_missing_corporations(
     current_time = deactivated_at or get_current_time()
     active_codes = set(active_corp_codes)
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         rows = connection.execute(
             """
             SELECT corp_code
@@ -267,12 +237,7 @@ def deactivate_missing_corporations(
             ],
         )
 
-        connection.commit()
-
         return len(missing_codes)
-
-    finally:
-        connection.close()
 
 
 def fetch_all_corporations(
@@ -281,9 +246,7 @@ def fetch_all_corporations(
     """
     기업 목록 전체를 조회한다.
     """
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         query = """
             SELECT
                 corp_code,
@@ -305,9 +268,6 @@ def fetch_all_corporations(
         rows = connection.execute(query).fetchall()
 
         return [dict(row) for row in rows]
-
-    finally:
-        connection.close()
 
 
 def search_corporations_by_name(
@@ -338,9 +298,7 @@ def search_corporations_by_name(
             "limit은 1 이상이어야 합니다."
         )
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         query = """
             SELECT
                 corp_code,
@@ -391,15 +349,12 @@ def search_corporations_by_name(
             for row in rows
         ]
 
-    finally:
-        connection.close()
-
 
 def count_corporations() -> int:
     """
     저장된 기업 정보의 전체 개수를 반환한다.
     """
-    with get_connection() as connection:
+    with database_connection() as connection:
         row = connection.execute(
             """
             SELECT COUNT(*)
@@ -426,7 +381,7 @@ def count_corporations_by_keyword(
 
     search_keyword = f"%{normalized_keyword}%"
 
-    with get_connection() as connection:
+    with database_connection() as connection:
         row = connection.execute(
             """
             SELECT COUNT(*) AS total_count
@@ -446,4 +401,3 @@ def count_corporations_by_keyword(
         ).fetchone()
 
     return int(row["total_count"])
-

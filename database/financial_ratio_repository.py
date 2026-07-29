@@ -1,7 +1,6 @@
 from collections.abc import Iterable
-from datetime import datetime
 from utils import get_current_time
-from database.connection import get_connection
+from database.connection import database_connection
 
 
 def upsert_financial_ratios(
@@ -40,9 +39,7 @@ def upsert_financial_ratios(
         for row in ratio_rows
     ]
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         connection.executemany(
             """
             INSERT INTO financial_ratio_results (
@@ -77,15 +74,6 @@ def upsert_financial_ratios(
             """,
             values,
         )
-
-        connection.commit()
-
-    except Exception:
-        connection.rollback()
-        raise
-
-    finally:
-        connection.close()
 
     return len(values)
 
@@ -151,9 +139,7 @@ def fetch_financial_ratios(
             ratio_code
     """
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         cursor = connection.execute(
             query,
             parameters,
@@ -163,9 +149,6 @@ def fetch_financial_ratios(
             dict(row)
             for row in cursor.fetchall()
         ]
-
-    finally:
-        connection.close()
 
 
 def fetch_financial_ratio(
@@ -179,9 +162,7 @@ def fetch_financial_ratio(
     """
     특정 재무비율 한 건을 조회한다.
     """
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         cursor = connection.execute(
             """
             SELECT
@@ -222,9 +203,6 @@ def fetch_financial_ratio(
 
         return dict(row)
 
-    finally:
-        connection.close()
-
 
 def delete_financial_ratios(
     corp_code: str,
@@ -258,24 +236,11 @@ def delete_financial_ratios(
         query += " AND calculation_version = ?"
         parameters.append(calculation_version)
 
-    connection = get_connection()
-
-    try:
+    with database_connection() as connection:
         cursor = connection.execute(
             query,
             parameters,
         )
 
-        connection.commit()
-
         return cursor.rowcount
-
-    except Exception:
-        connection.rollback()
-        raise
-
-    finally:
-        connection.close()
-
-
 
