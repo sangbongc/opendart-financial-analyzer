@@ -2,6 +2,7 @@ from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 from xml.etree import ElementTree
 from collections import defaultdict
+from dataclasses import dataclass
 
 from xbrl.exceptions import (
     XbrlNoteTableParseError,
@@ -351,6 +352,247 @@ def _get_presentation_file_name(
     return file_name
 
 
+
+@dataclass(frozen=True)
+class PresentationTableCandidate:
+    """
+    presentation linkbase에서 발견한 Table concept 후보를 나타낸다.
+    """
+
+    role_uri: str
+    concept_id: str
+    local_name: str
+    href: str
+
+
+def find_presentation_table_candidates(
+    content: bytes,
+    table_local_name: str,
+) -> list[PresentationTableCandidate]:
+    """
+    presentation linkbase 전체에서 정확히 일치하는
+    Table concept와 해당 role URI를 찾는다.
+    """
+    if not content:
+        raise ValueError(
+            "XBRL 파일 내용이 비어 있습니다."
+        )
+
+    try:
+        with ZipFile(BytesIO(content)) as archive:
+            presentation_file_name = (
+                _get_presentation_file_name(archive)
+            )
+
+            with archive.open(
+                presentation_file_name
+            ) as file:
+                root = (
+                    ElementTree.parse(file)
+                    .getroot()
+                )
+
+    except BadZipFile as error:
+        raise XbrlNoteTableParseError(
+            "유효한 XBRL ZIP 파일이 아닙니다."
+        ) from error
+
+    except ElementTree.ParseError as error:
+        raise XbrlNoteTableParseError(
+            "presentation linkbase XML을 "
+            "파싱하지 못했습니다."
+        ) from error
+
+    role_attribute = f"{{{XLINK_NS}}}role"
+
+    candidates: list[
+        PresentationTableCandidate
+    ] = []
+
+    seen: set[tuple[str, str]] = set()
+
+    for presentation_link in root.findall(
+        f".//{{{LINK_NS}}}presentationLink"
+    ):
+        role_uri = presentation_link.get(
+            role_attribute,
+            "",
+        )
+
+        locator_map = _build_locator_map(
+            presentation_link
+        )
+
+        for concept in locator_map.values():
+            if (
+                concept["local_name"]
+                != table_local_name
+            ):
+                continue
+
+            key = (
+                role_uri,
+                concept["concept_id"],
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+
+            candidates.append(
+                PresentationTableCandidate(
+                    role_uri=role_uri,
+                    concept_id=concept["concept_id"],
+                    local_name=concept["local_name"],
+                    href=concept["href"],
+                )
+            )
+
+    return candidates
+
+
+
+def _find_line_items_locator_labels(
+    table_label: str,
+    table_local_name: str,
+    locator_map: dict[str, dict[str, str]],
+    child_map: dict[
+        str,
+        list[tuple[float, str]],
+    ],
+    parent_map: dict[
+        str,
+        list[tuple[float, str]],
+    ],
+) -> list[str]:
+    """
+    Table concept과 연관된 LineItems locator를 찾는다.
+
+    탐색 순서:
+    1. 정확한 이름의 직접 자식
+    2. 정확한 이름의 같은 부모 형제
+    3. 직접 자식 중 LineItems로 끝나는 concept
+    4. 같은 부모 형제 중 LineItems로 끝나는 concept
+    5. Table 하위 후손 중 LineItems로 끝나는 concept
+    """
+    expected_name = (
+        table_local_name.removesuffix("Table")
+        + "LineItems"
+    )
+
+    result: list[str] = []
+
+    def append_if_matching(
+        locator_label: str,
+        exact_only: bool,
+    ) -> None:
+        concept = locator_map.get(
+            locator_label
+        )
+
+        if concept is None:
+            return
+
+        local_name = concept["local_name"]
+
+        matches = (
+            local_name == expected_name
+            if exact_only
+            else local_name.endswith(
+                "LineItems"
+            )
+        )
+
+        if (
+            matches
+            and locator_label not in result
+        ):
+            result.append(locator_label)
+
+    direct_children = child_map.get(
+        table_label,
+        [],
+    )
+
+    # 1. 정확한 이름의 직접 자식
+    for _, child_label in direct_children:
+        append_if_matching(
+            child_label,
+            exact_only=True,
+        )
+
+    # 2. 정확한 이름의 같은 부모 형제
+    for _, parent_label in parent_map.get(
+        table_label,
+        [],
+    ):
+        for _, sibling_label in child_map.get(
+            parent_label,
+            [],
+        ):
+            append_if_matching(
+                sibling_label,
+                exact_only=True,
+            )
+
+    if result:
+        return result
+
+    # 3. 직접 자식 중 LineItems
+    for _, child_label in direct_children:
+        append_if_matching(
+            child_label,
+            exact_only=False,
+        )
+
+    # 4. 같은 부모 형제 중 LineItems
+    for _, parent_label in parent_map.get(
+        table_label,
+        [],
+    ):
+        for _, sibling_label in child_map.get(
+            parent_label,
+            [],
+        ):
+            append_if_matching(
+                sibling_label,
+                exact_only=False,
+            )
+
+    if result:
+        return result
+
+    # 5. Table 하위 후손 중 LineItems
+    stack = [
+        child_label
+        for _, child_label in direct_children
+    ]
+    visited: set[str] = set()
+
+    while stack:
+        current_label = stack.pop()
+
+        if current_label in visited:
+            continue
+
+        visited.add(current_label)
+
+        append_if_matching(
+            current_label,
+            exact_only=False,
+        )
+
+        stack.extend(
+            child_label
+            for _, child_label in child_map.get(
+                current_label,
+                [],
+            )
+        )
+
+    return result
+
 def parse_note_table_line_items(
     content: bytes,
     role_uri: str,
@@ -415,78 +657,48 @@ def parse_note_table_line_items(
         )
     )
 
-    table_base_name = (
-        table_local_name.removesuffix(
-            "Table"
-        )
-    )
-
-    expected_line_items_name = (
-        table_base_name
-        + "LineItems"
-    )
-
     result: list[
         PresentationConcept
     ] = []
 
     for table_label in table_labels:
-        parents = parent_map.get(
-            table_label,
-            [],
+        line_items_labels = (
+            _find_line_items_locator_labels(
+                table_label=table_label,
+                table_local_name=table_local_name,
+                locator_map=locator_map,
+                child_map=child_map,
+                parent_map=parent_map,
+            )
         )
 
-        for _, parent_label in parents:
-            siblings = child_map.get(
-                parent_label,
-                [],
+        for line_items_label in line_items_labels:
+            line_items = locator_map.get(
+                line_items_label
             )
 
-            for _, sibling_label in siblings:
-                sibling = locator_map.get(
-                    sibling_label
-                )
+            if line_items is None:
+                continue
 
-                if sibling is None:
+            for order, child_label in child_map.get(
+                line_items_label,
+                [],
+            ):
+                if child_label not in locator_map:
                     continue
 
-                if (
-                    sibling["local_name"]
-                    != expected_line_items_name
-                ):
-                    continue
-
-                line_item_children = (
-                    child_map.get(
-                        sibling_label,
-                        [],
+                result.extend(
+                    _walk_presentation_tree(
+                        locator_label=child_label,
+                        locator_map=locator_map,
+                        child_map=child_map,
+                        parent_concept_id=(
+                            line_items["concept_id"]
+                        ),
+                        depth=0,
+                        order=order,
                     )
                 )
-
-                for order, child_label in (
-                    line_item_children
-                ):
-                    child = locator_map.get(
-                        child_label
-                    )
-
-                    if child is None:
-                        continue
-
-                    result.extend(
-                        _walk_presentation_tree(
-                            locator_label=(
-                                child_label
-                            ),
-                            locator_map=locator_map,
-                            child_map=child_map,
-                            parent_concept_id=(
-                                sibling["concept_id"]
-                            ),
-                            depth=0,
-                            order=order,
-                        )
-                    )
 
     if not result:
         raise XbrlNoteTableParseError(
@@ -496,5 +708,3 @@ def parse_note_table_line_items(
         )
 
     return result
-
-
