@@ -453,6 +453,228 @@ def find_presentation_table_candidates(
 
 
 
+
+def find_presentation_table_candidates_by_keywords(
+    content: bytes,
+    keywords: tuple[str, ...],
+) -> list[PresentationTableCandidate]:
+    """
+    presentation linkbase 전체에서 키워드와 관련된
+    Table concept 후보를 찾는다.
+
+    정확한 Table 이름을 알 수 없는 회사의 XBRL 구조를
+    진단하기 위한 함수다. 이 함수의 결과를 곧바로
+    자동 선택하지 않고 후보 확인 용도로 사용한다.
+    """
+    if not content:
+        raise ValueError(
+            "XBRL 파일 내용이 비어 있습니다."
+        )
+
+    normalized_keywords = tuple(
+        keyword.replace(" ", "").lower()
+        for keyword in keywords
+        if keyword.strip()
+    )
+
+    if not normalized_keywords:
+        raise ValueError(
+            "후보 검색 키워드를 하나 이상 입력해야 합니다."
+        )
+
+    try:
+        with ZipFile(
+            BytesIO(content)
+        ) as archive:
+            presentation_file_name = (
+                _get_presentation_file_name(
+                    archive
+                )
+            )
+
+            with archive.open(
+                presentation_file_name
+            ) as file:
+                root = (
+                    ElementTree.parse(file)
+                    .getroot()
+                )
+
+    except BadZipFile as error:
+        raise XbrlNoteTableParseError(
+            "유효한 XBRL ZIP 파일이 아닙니다."
+        ) from error
+
+    except ElementTree.ParseError as error:
+        raise XbrlNoteTableParseError(
+            "presentation linkbase XML을 "
+            "파싱하지 못했습니다."
+        ) from error
+
+    role_attribute = f"{{{XLINK_NS}}}role"
+
+    candidates: list[
+        PresentationTableCandidate
+    ] = []
+
+    seen: set[tuple[str, str]] = set()
+
+    for presentation_link in root.findall(
+        f".//{{{LINK_NS}}}presentationLink"
+    ):
+        role_uri = presentation_link.get(
+            role_attribute,
+            "",
+        )
+
+        locator_map = _build_locator_map(
+            presentation_link
+        )
+
+        for concept in locator_map.values():
+            local_name = concept["local_name"]
+
+            if not local_name.endswith("Table"):
+                continue
+
+            normalized_local_name = (
+                local_name.replace(" ", "").lower()
+            )
+
+            if not any(
+                keyword in normalized_local_name
+                for keyword in normalized_keywords
+            ):
+                continue
+
+            key = (
+                role_uri,
+                concept["concept_id"],
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+
+            candidates.append(
+                PresentationTableCandidate(
+                    role_uri=role_uri,
+                    concept_id=concept["concept_id"],
+                    local_name=local_name,
+                    href=concept["href"],
+                )
+            )
+
+    candidates.sort(
+        key=lambda candidate: (
+            candidate.role_uri,
+            candidate.local_name,
+        )
+    )
+
+    return candidates
+
+
+def parse_presentation_role_concepts(
+    content: bytes,
+    role_uri: str,
+) -> list[PresentationConcept]:
+    """
+    지정한 presentation role의 전체 concept 트리를 반환한다.
+
+    부모가 없는 root locator부터 순회하며,
+    연결되지 않은 locator가 있으면 마지막에 별도로 포함한다.
+    """
+    if not content:
+        raise ValueError(
+            "XBRL 파일 내용이 비어 있습니다."
+        )
+
+    if not role_uri.strip():
+        raise ValueError(
+            "role_uri를 입력해야 합니다."
+        )
+
+    try:
+        with ZipFile(
+            BytesIO(content)
+        ) as archive:
+            presentation_file_name = (
+                _get_presentation_file_name(
+                    archive
+                )
+            )
+
+            with archive.open(
+                presentation_file_name
+            ) as file:
+                root = (
+                    ElementTree.parse(file)
+                    .getroot()
+                )
+
+    except BadZipFile as error:
+        raise XbrlNoteTableParseError(
+            "유효한 XBRL ZIP 파일이 아닙니다."
+        ) from error
+
+    except ElementTree.ParseError as error:
+        raise XbrlNoteTableParseError(
+            "presentation linkbase XML을 "
+            "파싱하지 못했습니다."
+        ) from error
+
+    presentation_link = _find_presentation_link(
+        root=root,
+        role_uri=role_uri,
+    )
+
+    locator_map = _build_locator_map(
+        presentation_link
+    )
+    child_map = _build_child_map(
+        presentation_link
+    )
+    parent_map = _build_parent_map(
+        presentation_link
+    )
+
+    root_labels = [
+        locator_label
+        for locator_label in locator_map
+        if not parent_map.get(locator_label)
+    ]
+
+    result: list[PresentationConcept] = []
+    visited: set[str] = set()
+
+    for root_label in root_labels:
+        result.extend(
+            _walk_presentation_tree(
+                locator_label=root_label,
+                locator_map=locator_map,
+                child_map=child_map,
+                visited=visited,
+            )
+        )
+
+    # presentationArc에 연결되지 않은 locator도 진단에 포함한다.
+    for locator_label in locator_map:
+        if locator_label in visited:
+            continue
+
+        result.extend(
+            _walk_presentation_tree(
+                locator_label=locator_label,
+                locator_map=locator_map,
+                child_map=child_map,
+                visited=visited,
+            )
+        )
+
+    return result
+
 def _find_line_items_locator_labels(
     table_label: str,
     table_local_name: str,

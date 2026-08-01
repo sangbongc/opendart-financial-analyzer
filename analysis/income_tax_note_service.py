@@ -13,6 +13,8 @@ from xbrl.exceptions import (
 )
 from xbrl.presentation_parser import (
     find_presentation_table_candidates,
+    find_presentation_table_candidates_by_keywords,
+    parse_presentation_role_concepts,
 )
 from xbrl.xbrl_note_table_parser import (
     parse_note_table_items,
@@ -26,8 +28,32 @@ from dart.xbrl_file_service import (
 )
 
 
-MAJOR_COMPONENTS_OF_TAX_EXPENSE_TABLE = (
-    "MajorComponentsOfTaxExpenseIncomeTable"
+INCOME_TAX_COMPONENT_TABLE_NAMES = (
+    "MajorComponentsOfTaxExpenseIncomeTable",
+    (
+        "CurrentTaxExpenseIncomeAndAdjustmentsFor"
+        "CurrentTaxOfPriorPeriodsTable"
+    ),
+)
+
+
+INCOME_TAX_TABLE_DIAGNOSTIC_KEYWORDS = (
+    "TaxExpense",
+    "IncomeTax",
+    "CorporateTax",
+    "CurrentTax",
+    "DeferredTax",
+)
+
+INCOME_TAX_CONCEPT_DIAGNOSTIC_KEYWORDS = (
+    "Tax",
+    "IncomeTax",
+    "CurrentTax",
+    "DeferredTax",
+    "TaxExpense",
+    "TaxIncome",
+    "PriorPeriod",
+    "Equity",
 )
 
 
@@ -168,11 +194,8 @@ def _find_major_components_items(
     role URI를 하드코딩하지 않고 처리한다.
     """
     try:
-        candidates = find_presentation_table_candidates(
-            content=content,
-            table_local_name=(
-                MAJOR_COMPONENTS_OF_TAX_EXPENSE_TABLE
-            ),
+        candidates = _find_income_tax_table_candidates(
+            content
         )
 
     except Exception as error:
@@ -181,20 +204,29 @@ def _find_major_components_items(
             f"{error}"
         ) from error
 
-    exact_candidates = candidates
+    if not candidates:
+        diagnostic_summary = (
+            _build_income_tax_table_candidate_summary(
+                content
+            )
+        )
 
-    if not exact_candidates:
+        supported_names = ", ".join(
+            INCOME_TAX_COMPONENT_TABLE_NAMES
+        )
+
         raise IncomeTaxNoteAnalysisError(
-            "법인세비용 구성표 Table concept를 "
+            "지원하는 법인세비용 구성표 Table concept를 "
             "찾지 못했습니다: "
-            f"{MAJOR_COMPONENTS_OF_TAX_EXPENSE_TABLE}"
+            f"{supported_names}"
+            f"{diagnostic_summary}"
         )
 
     best_items: list[NoteTableItem] | None = None
     best_score = -1
     candidate_errors: list[str] = []
 
-    for candidate in exact_candidates:
+    for candidate in candidates:
         try:
             items = parse_note_table_items(
                 content=content,
@@ -236,7 +268,7 @@ def _find_major_components_items(
     if best_score <= 0:
         roles = ", ".join(
             candidate.role_uri
-            for candidate in exact_candidates
+            for candidate in candidates
         )
 
         raise IncomeTaxNoteAnalysisError(
@@ -248,6 +280,41 @@ def _find_major_components_items(
 
     return best_items
 
+
+
+def _find_income_tax_table_candidates(
+    content: bytes,
+):
+    """
+    지원하는 법인세비용 구성표 이름별로
+    presentation role 후보를 수집한다.
+    """
+    candidates = []
+    seen: set[tuple[str, str]] = set()
+
+    for table_local_name in (
+        INCOME_TAX_COMPONENT_TABLE_NAMES
+    ):
+        found_candidates = (
+            find_presentation_table_candidates(
+                content=content,
+                table_local_name=table_local_name,
+            )
+        )
+
+        for candidate in found_candidates:
+            key = (
+                candidate.role_uri,
+                candidate.concept_id,
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            candidates.append(candidate)
+
+    return candidates
 
 def _count_matching_facts(
     items: list[NoteTableItem],
@@ -268,6 +335,134 @@ def _count_matching_facts(
         )
         is not None
     )
+
+
+def _build_income_tax_table_candidate_summary(
+    content: bytes,
+) -> str:
+    """
+    정확한 법인세비용 구성표 이름을 찾지 못한 경우,
+    키워드상 관련성이 있는 Table 후보를 오류 메시지로 정리한다.
+    """
+    try:
+        candidates = (
+            find_presentation_table_candidates_by_keywords(
+                content=content,
+                keywords=(
+                    INCOME_TAX_TABLE_DIAGNOSTIC_KEYWORDS
+                ),
+            )
+        )
+
+    except Exception as error:
+        return (
+            "\n법인세 관련 후보 탐색에도 실패했습니다: "
+            f"{error}"
+        )
+
+    if not candidates:
+        return (
+            "\n법인세 관련 Table 후보도 찾지 못했습니다."
+        )
+
+    lines = [
+        "\n발견된 법인세 관련 Table 후보:",
+    ]
+
+    for index, candidate in enumerate(
+        candidates,
+        start=1,
+    ):
+        lines.append(
+            f"{index}. role_uri={candidate.role_uri}, "
+            f"table={candidate.local_name}, "
+            f"concept_id={candidate.concept_id}"
+        )
+
+    role_uris = list(
+        dict.fromkeys(
+            candidate.role_uri
+            for candidate in candidates
+            if (
+                "role-U" in candidate.role_uri
+                or "entity" in candidate.role_uri
+            )
+        )
+    )
+
+    for role_uri in role_uris:
+        lines.extend(
+            _build_income_tax_role_concept_lines(
+                content=content,
+                role_uri=role_uri,
+            )
+        )
+
+    return "\n".join(lines)
+
+
+def _build_income_tax_role_concept_lines(
+    content: bytes,
+    role_uri: str,
+) -> list[str]:
+    """
+    후보 role 안의 법인세 관련 concept 구조를 진단용으로 정리한다.
+    """
+    try:
+        concepts = parse_presentation_role_concepts(
+            content=content,
+            role_uri=role_uri,
+        )
+
+    except Exception as error:
+        return [
+            "",
+            f"[role concept 조회 실패] {role_uri}",
+            f"원인: {error}",
+        ]
+
+    normalized_keywords = tuple(
+        keyword.lower()
+        for keyword in (
+            INCOME_TAX_CONCEPT_DIAGNOSTIC_KEYWORDS
+        )
+    )
+
+    matched = [
+        concept
+        for concept in concepts
+        if any(
+            keyword in concept.local_name.lower()
+            for keyword in normalized_keywords
+        )
+    ]
+
+    lines = [
+        "",
+        f"[법인세 관련 role concept] {role_uri}",
+    ]
+
+    if not matched:
+        lines.append(
+            "법인세 관련 local name을 찾지 못했습니다."
+        )
+        return lines
+
+    for concept in matched:
+        indent = "  " * concept.depth
+        parent = (
+            concept.parent_concept_id
+            or "-"
+        )
+
+        lines.append(
+            f"{indent}- {concept.local_name} "
+            f"(concept_id={concept.concept_id}, "
+            f"parent={parent}, "
+            f"has_children={concept.has_children})"
+        )
+
+    return lines
 
 def _convert_to_income_tax_note_value(
     item: NoteTableItem,
