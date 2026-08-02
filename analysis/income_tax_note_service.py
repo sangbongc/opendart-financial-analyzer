@@ -135,7 +135,13 @@ def get_major_components_of_tax_expense(
             "법인세비용 구성표를 파싱하지 못했습니다: "
             f"{error}"
         ) from error
-
+    # 주석 파싱 디버그용
+    # _debug_selected_items(
+    #     items=items,
+    #     label_map=label_map,
+    #     bsns_year=bsns_year,
+    #     fs_div=fs_div,
+    # )
     return [
         _convert_to_income_tax_note_value(
             item=item,
@@ -511,7 +517,10 @@ def _get_fact_decimal_value(
     fact: XbrlFact | None,
 ) -> Decimal | None:
     """
-    선택된 XBRL Fact의 문자열 값을 Decimal로 변환한다.
+    선택된 XBRL Fact가 숫자형이면 Decimal로 변환한다.
+
+    설명형 Fact처럼 unit_ref가 없는 비수치 항목은
+    금액값이 없는 것으로 처리한다.
     """
     if fact is None:
         return None
@@ -522,15 +531,29 @@ def _get_fact_decimal_value(
     if fact.value is None:
         return None
 
+    # 금액·비율 등 숫자형 Fact는 일반적으로 unit_ref를 가진다.
+    # unit_ref가 없는 경우 설명형 문자열 Fact로 본다.
+    if fact.unit_ref is None:
+        return None
+
+    normalized_value = (
+        fact.value
+        .strip()
+        .replace(",", "")
+    )
+
+    if not normalized_value:
+        return None
+
     try:
-        return Decimal(
-            fact.value.replace(",", "")
-        )
+        return Decimal(normalized_value)
 
     except InvalidOperation as error:
         raise IncomeTaxNoteAnalysisError(
-            "법인세 주석 Fact 값을 숫자로 "
-            f"변환하지 못했습니다: {fact.value}"
+            "숫자형 법인세 주석 Fact 값을 "
+            "Decimal로 변환하지 못했습니다: "
+            f"value={fact.value}, "
+            f"unit_ref={fact.unit_ref}"
         ) from error
 
 
@@ -562,3 +585,35 @@ def _validate_inputs(
         raise ValueError(
             "fs_div는 CFS 또는 OFS여야 합니다."
         )
+
+
+def _debug_selected_items(
+    items: list[NoteTableItem],
+    label_map: dict[str, str],
+    bsns_year: str,
+    fs_div: str,
+) -> None:
+    for item in items:
+        fact = select_note_fact(
+            facts=item.facts,
+            bsns_year=bsns_year,
+            fs_div=fs_div,
+        )
+
+        print("-" * 80)
+        print("local_name:", item.concept.local_name)
+        print(
+            "label:",
+            label_map.get(item.concept.concept_id),
+        )
+        print("depth:", item.concept.depth)
+        print("has_children:", item.concept.has_children)
+
+        if fact is None:
+            print("fact: None")
+            continue
+
+        print("value:", fact.value)
+        print("unit_ref:", fact.unit_ref)
+        print("decimals:", fact.decimals)
+        print("context_ref:", fact.context_ref)
