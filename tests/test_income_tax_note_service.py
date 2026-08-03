@@ -47,6 +47,22 @@ def _make_fact(
     )
 
 
+
+def _make_candidate(
+    role_uri: str = "http://example.com/role/income-tax",
+    concept_id: str = "tax_MajorComponentsOfTaxExpenseIncomeTable",
+    local_name: str = "MajorComponentsOfTaxExpenseIncomeTable",
+) -> SimpleNamespace:
+    """
+    presentation Table 후보 대역을 생성한다.
+    """
+    return SimpleNamespace(
+        role_uri=role_uri,
+        concept_id=concept_id,
+        local_name=local_name,
+    )
+
+
 def _make_note_item(
     concept_id: str = "tax_CurrentTaxExpenseIncome",
     local_name: str = "CurrentTaxExpenseIncome",
@@ -74,6 +90,9 @@ def _make_note_item(
     "analysis.income_tax_note_service.parse_xbrl_label_map"
 )
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -82,6 +101,7 @@ def _make_note_item(
 def test_get_major_components_calls_parser(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_find_candidates,
     mock_parse_xbrl_label_map,
 ) -> None:
     """
@@ -95,6 +115,7 @@ def test_get_major_components_calls_parser(
             "당기법인세비용(수익)"
         ),
     }
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.return_value = [
         item
     ]
@@ -130,6 +151,9 @@ def test_get_major_components_calls_parser(
     "analysis.income_tax_note_service.parse_xbrl_label_map"
 )
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -138,6 +162,7 @@ def test_get_major_components_calls_parser(
 def test_select_note_fact_is_called_for_each_item(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_find_candidates,
     mock_parse_xbrl_label_map,
 ) -> None:
     """
@@ -161,20 +186,18 @@ def test_select_note_fact_is_called_for_each_item(
         ),
     ]
 
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.return_value = (
         items
     )
-    mock_select_note_fact.side_effect = [
-        _make_fact(
-            value="9311684000000"
-        ),
-        _make_fact(
-            value="-5037018000000"
-        ),
-        _make_fact(
-            value="4274666000000"
-        ),
+    selected_facts = [
+        _make_fact(value="9311684000000"),
+        _make_fact(value="-5037018000000"),
+        _make_fact(value="4274666000000"),
     ]
+    mock_select_note_fact.side_effect = (
+        selected_facts + selected_facts
+    )
 
     results = get_major_components_of_tax_expense(
         content=b"sample-xbrl-content",
@@ -182,7 +205,8 @@ def test_select_note_fact_is_called_for_each_item(
         fs_div="CFS",
     )
 
-    assert mock_select_note_fact.call_count == 3
+    # 후보 점수 계산 3회 + 결과 변환 3회
+    assert mock_select_note_fact.call_count == 6
     assert len(results) == 3
 
     for call in mock_select_note_fact.call_args_list:
@@ -197,6 +221,9 @@ def test_select_note_fact_is_called_for_each_item(
     "analysis.income_tax_note_service.parse_xbrl_label_map"
 )
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -205,6 +232,7 @@ def test_select_note_fact_is_called_for_each_item(
 def test_fact_value_is_converted_to_decimal(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_find_candidates,
     mock_parse_xbrl_label_map,
 ) -> None:
     """
@@ -213,6 +241,7 @@ def test_fact_value_is_converted_to_decimal(
     """
     item = _make_note_item()
 
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.return_value = [
         item
     ]
@@ -241,6 +270,9 @@ def test_fact_value_is_converted_to_decimal(
     "analysis.income_tax_note_service.parse_xbrl_label_map"
 )
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -249,6 +281,7 @@ def test_fact_value_is_converted_to_decimal(
 def test_nil_fact_is_converted_to_none(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_find_candidates,
     mock_parse_xbrl_label_map,
 ) -> None:
     """
@@ -257,6 +290,7 @@ def test_nil_fact_is_converted_to_none(
     """
     item = _make_note_item()
 
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.return_value = [
         item
     ]
@@ -280,6 +314,9 @@ def test_nil_fact_is_converted_to_none(
     "analysis.income_tax_note_service.parse_xbrl_label_map"
 )
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -288,6 +325,7 @@ def test_nil_fact_is_converted_to_none(
 def test_missing_fact_is_converted_to_none(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_find_candidates,
     mock_parse_xbrl_label_map,
 ) -> None:
     """
@@ -299,10 +337,17 @@ def test_missing_fact_is_converted_to_none(
         local_name="TaxItemWithoutFact",
     )
 
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.return_value = [
         item
     ]
-    mock_select_note_fact.return_value = None
+    # 후보 점수 계산 단계에는 최소 1개의 Fact가 있어야
+    # 해당 Table 후보가 선택된다. 결과 변환 단계에서만
+    # Fact가 없는 상황을 재현한다.
+    mock_select_note_fact.side_effect = [
+        _make_fact(),
+        None,
+    ]
 
     results = get_major_components_of_tax_expense(
         content=b"sample-xbrl-content",
@@ -324,6 +369,9 @@ def test_missing_fact_is_converted_to_none(
     "analysis.income_tax_note_service.parse_xbrl_label_map"
 )
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.select_note_fact"
 )
 @patch(
@@ -332,6 +380,7 @@ def test_missing_fact_is_converted_to_none(
 def test_presentation_structure_is_preserved(
     mock_parse_note_table_items,
     mock_select_note_fact,
+    mock_find_candidates,
     mock_parse_xbrl_label_map,
 ) -> None:
     """
@@ -355,18 +404,18 @@ def test_presentation_structure_is_preserved(
         has_children=False,
     )
 
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.return_value = [
         parent_item,
         child_item,
     ]
-    mock_select_note_fact.side_effect = [
-        _make_fact(
-            value="9311684000000"
-        ),
-        _make_fact(
-            value="8951271000000"
-        ),
+    selected_facts = [
+        _make_fact(value="9311684000000"),
+        _make_fact(value="8951271000000"),
     ]
+    mock_select_note_fact.side_effect = (
+        selected_facts + selected_facts
+    )
 
     results = get_major_components_of_tax_expense(
         content=b"sample-xbrl-content",
@@ -382,15 +431,20 @@ def test_presentation_structure_is_preserved(
 
 
 @patch(
+    "analysis.income_tax_note_service._find_income_tax_table_candidates"
+)
+@patch(
     "analysis.income_tax_note_service.parse_note_table_items"
 )
 def test_parser_error_is_wrapped(
     mock_parse_note_table_items,
+    mock_find_candidates,
 ) -> None:
     """
     범용 파서에서 발생한 예외가 서비스 전용 예외로
     변환되는지 검증한다.
     """
+    mock_find_candidates.return_value = [_make_candidate()]
     mock_parse_note_table_items.side_effect = (
         RuntimeError("parser failed")
     )
@@ -471,7 +525,6 @@ def test_invalid_fact_value_raises_analysis_error() -> None:
         _get_fact_decimal_value(fact)
 
     assert (
-        "Fact 값을 숫자로 변환하지 못했습니다"
+        "숫자형 법인세 주석 Fact 값을 Decimal로 변환하지 못했습니다"
         in str(error_info.value)
     )
-
