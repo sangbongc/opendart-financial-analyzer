@@ -1,32 +1,23 @@
-from analysis.account_change_ratio_service import (
-    AccountChangeRatioError,
-    calculate_and_save_account_change_ratios,
-)
-from analysis.financial_ratio_service import (
-    FinancialRatioCalculationError,
-    calculate_and_save_financial_ratios,
-)
+
 from console.commands.corporation_commands import (
     input_financial_statement_conditions,
 )
 from console.corporation_selector import (
     select_corporation,
 )
-from dart.financial_statement_service import (
-    sync_financial_statements,
+from analysis.prepare_service import (
+    prepare_financial_data,
+    PrepareFinancialDataError,
 )
-
 
 def handle_prepare_financial_data() -> None:
     """
-    기업과 재무제표 조건을 한 번 입력받아 다음 작업을
-    순서대로 수행한다.
+    기업과 재무제표 조건을 한 번 입력받아
+    재무 분석에 필요한 데이터를 순서대로 준비한다.
 
     1. DART 재무제표 수집 및 저장
     2. 저장된 재무제표 기반 재무비율 계산 및 저장
     3. 저장된 재무제표 기반 계정별 증감률 계산 및 저장
-
-    모든 작업이 완료되면 계정별 증감률을 출력한다.
     """
     print()
     print("[재무 분석 데이터 준비]")
@@ -55,80 +46,82 @@ def handle_prepare_financial_data() -> None:
     print(f"재무제표 구분: {fs_div}")
 
     print()
-    print("[1/3] 재무제표 수집 및 저장")
-    print("-" * 60)
+    print("재무 분석 데이터 준비를 시작합니다.")
 
     try:
-        statement_result = sync_financial_statements(
+        result = prepare_financial_data(
             corp_code=corp_code,
             bsns_year=bsns_year,
             reprt_code=reprt_code,
             fs_div=fs_div,
         )
 
-    except Exception as error:
-        print(
-            "재무제표 수집 및 저장 중 오류가 "
-            f"발생했습니다: {error}"
+    except PrepareFinancialDataError as error:
+        stage_names = {
+            "financial_statements": "재무제표 수집 및 저장",
+            "financial_ratios": "재무비율 계산 및 저장",
+            "account_changes": "계정별 증감률 계산 및 저장",
+        }
+
+        stage_name = stage_names.get(
+            error.stage,
+            error.stage,
         )
-        print(
-            "원천 재무제표가 준비되지 않아 "
-            "후속 계산을 중단합니다."
-        )
+
+        print()
+        print(f"[준비 실패: {stage_name}]")
+        print("-" * 60)
+        print(error)
         return
 
-    print(
-        f"수신 행 수: "
-        f"{statement_result['received_count']:,}"
-    )
-    print(
-        f"신규 저장 행 수: "
-        f"{statement_result['saved_count']:,}"
-    )
-    print(
-        f"중복 제외 행 수: "
-        f"{statement_result['ignored_count']:,}"
-    )
-
-    print()
-    print("[2/3] 재무비율 계산 및 저장")
-    print("-" * 60)
-
-    try:
-        ratio_result = calculate_and_save_financial_ratios(
-            corp_code=corp_code,
-            bsns_year=bsns_year,
-            reprt_code=reprt_code,
-            fs_div=fs_div,
-        )
-
-    except FinancialRatioCalculationError as error:
-        print(f"재무비율 계산 실패: {error}")
-        print(
-            "재무비율 계산이 완료되지 않아 "
-            "후속 계산을 중단합니다."
-        )
+    except ValueError as error:
+        print()
+        print(f"입력값 오류: {error}")
         return
 
     except Exception as error:
+        print()
         print(
-            "재무비율 계산 및 저장 중 예상하지 못한 "
+            "재무 분석 데이터 준비 중 예상하지 못한 "
             f"오류가 발생했습니다: {error}"
         )
         return
 
+    summary = result["summary"]
+
+    print()
+    print("[재무제표 수집 및 저장]")
+    print("-" * 60)
+    print(
+        f"수신 행 수: "
+        f"{summary['received_statement_count']:,}"
+    )
+    print(
+        f"신규 저장 행 수: "
+        f"{summary['saved_statement_count']:,}"
+    )
+    print(
+        f"중복 제외 행 수: "
+        f"{summary['ignored_statement_count']:,}"
+    )
+
+    print()
+    print("[재무비율 계산 및 저장]")
+    print("-" * 60)
     print(
         f"계산 비율 수: "
-        f"{ratio_result['calculated_count']:,}"
+        f"{summary['calculated_ratio_count']:,}"
     )
     print(
         f"저장 또는 갱신 수: "
-        f"{ratio_result['saved_count']:,}"
+        f"{summary['saved_ratio_count']:,}"
     )
 
-    unavailable_ratios = ratio_result.get(
-        "unavailable_ratios",
-        [],
+    unavailable_ratios = (
+        result["financial_ratios"].get(
+            "unavailable_ratios",
+            [],
+        )
     )
 
     if unavailable_ratios:
@@ -138,41 +131,12 @@ def handle_prepare_financial_data() -> None:
         )
 
     print()
-    print("[3/3] 계정별 증감률 계산 및 저장")
+    print("[계정별 증감률 계산 및 저장]")
     print("-" * 60)
-
-    try:
-        change_results = (
-            calculate_and_save_account_change_ratios(
-                corp_code=corp_code,
-                bsns_year=bsns_year,
-                reprt_code=reprt_code,
-                fs_div=fs_div,
-            )
-        )
-
-    except AccountChangeRatioError as error:
-        print(f"계정별 증감률 계산 실패: {error}")
-        return
-
-    except Exception as error:
-        print(
-            "계정별 증감률 계산 및 저장 중 "
-            f"예상하지 못한 오류가 발생했습니다: {error}"
-        )
-        return
-
-    if not change_results:
-        print(
-            "계산할 수 있는 계정별 증감률이 없습니다."
-        )
-        return
-
     print(
         f"계산 및 저장 대상 계정 수: "
-        f"{len(change_results):,}"
+        f"{summary['calculated_change_count']:,}"
     )
-
 
     print()
     print("-" * 60)
