@@ -1,6 +1,6 @@
 # OpenDART Financial Analyzer (with 생성형 AI)
 
-OpenDART API를 이용하여 기업 기준정보·재무제표·감사보고서를 수집하고 SQLite에 저장한 뒤, 저장된 데이터를 기반으로 재무비율, 계정별 변동, 세무 지표 및 감사보고서 정보를 분석하는 Python 프로젝트입니다.
+OpenDART API를 이용하여 기업 기준정보·재무제표·감사보고서를 수집하고 SQLite에 저장한 뒤, 재무비율과 계정별 증감률 등 분석용 데이터를 구축하고, 이를 기반으로 재무·세무·감사 정보를 분석하는 Python 프로젝트입니다.
 
 단순한 API 호출 코드에 그치지 않고, 수집·정규화·저장·조회·분석·콘솔 출력의 책임을 계층별로 분리하는 방향으로 설계했습니다. 아키텍처 설계와 테스트, 결과 검증은 직접 수행했고, 구현 코드 작성에는 생성형 AI를 도구로 활용했습니다.
 
@@ -9,7 +9,8 @@ OpenDART API를 이용하여 기업 기준정보·재무제표·감사보고서�
 * 기업 고유번호 동기화 및 기업명·종목코드 검색
 * 단일회사 전체 재무제표 수집·정규화·저장 (연결·별도, 사업·분기·반기보고서 지원)
 * 주요 재무비율 계산(영업이익률·순이익률·ROA·ROE·부채비율·유동비율) 및 저장·조회
-* 계정별 증감액·증감률 계산과 주요 계정 이상징후 탐지
+* 계정별 증감액·증감률 계산·저장과 주요 계정 이상징후 탐지
+* 재무제표·재무비율·계정별 증감률 일괄 준비(Prepare) 및 여러 기업 대상 Batch Prepare 지원
 * 실효세율 계산, 이연법인세자산·부채 등 세무 관련 계정 변동 조회
 * XBRL 원문 파싱을 통한 법인세비용 주석 주요 구성항목 조회
 * 감사보고서 전문 수집(HTML 뷰어 페이지 순회 방식) 및 감사의견·근거단락·강조사항·기타사항·계속기업 관련 중요한 불확실성·핵심감사사항(KAM) 파싱, 종합 조회 콘솔 명령 제공
@@ -44,15 +45,17 @@ flowchart TD
     D6 --> DB
     D7 --> DB
 
-    DB --> E1[Financial Ratio Service]
-    DB --> E2[Account Change Service]
-    DB --> E3[Tax Analysis Service]
-    DB --> E4[Audit Report 종합 조회]
+    DB --> E1[Prepare Service]
+    DB --> E2[Financial Ratio Service]
+    DB --> E3[Account Change Service]
+    DB --> E4[Tax Analysis Service]
+    DB --> E5[Audit Report 종합 조회]
 
     E1 --> F[Console Command Modules]
     E2 --> F
     E3 --> F
     E4 --> F
+    E5 --> F
 ```
 
 ### 계층별 역할
@@ -74,9 +77,11 @@ flowchart TD
 ```text
 opendart-financial-analyzer/
 │
-├── analysis/
+analysis/
 │   ├── account_change_ratio_service.py
 │   ├── financial_ratio_service.py
+│   ├── prepare_service.py
+│   ├── batch_prepare_service.py
 │   ├── effective_tax_rate_service.py
 │   ├── tax_account_change_service.py
 │   └── income_tax_note_service.py
@@ -95,13 +100,15 @@ opendart-financial-analyzer/
 ├── console/
 │   ├── controller.py
 │   ├── corporation_selector.py
-│   └── commands/
-│       ├── audit_commands.py           # 감사보고서 종합 조회
-│       ├── corporation_commands.py
-│       ├── financial_statement_commands.py
-│       ├── financial_ratio_commands.py
-│       ├── income_tax_note_commands.py
-│       └── tax_commands.py
+│   commands/
+│   ├── audit_commands.py
+│   ├── corporation_commands.py
+│   ├── financial_statement_commands.py
+│   ├── financial_ratio_commands.py
+│   ├── prepare_commands.py
+│   ├── batch_prepare_commands.py
+│   ├── income_tax_note_commands.py
+│   └── tax_commands.py
 │
 ├── dart/
 │   ├── client.py
@@ -174,14 +181,14 @@ Mock 기반 단위 테스트와 Repository 테스트로, 외부 API를 호출하
 | 4 | 주요 재무비율 계산·저장·조회 | 완료 |
 | 5 | 계정별 증감액·증감률, 이상징후 탐지 | 완료 |
 | 6 | 실효세율·이연법인세 변동, XBRL 법인세 주석 파싱 | 완료 |
-| 7 | 콘솔 명령 구조 분리 | 완료 |
+| 7 | 콘솔 명령 구조 분리 및 Prepare·Batch Prepare 기능 구현 | 완료 |
 | 8 | 감사보고서 전문 수집(HTML 뷰어 순회), 감사의견·근거단락·강조사항·기타사항·계속기업 관련 중요한 불확실성·핵심감사사항(KAM) 파싱 및 종합 조회 콘솔 명령 | 완료 |
 
 ### 향후 계획
 
 * 회계이익-법인세비용 조정표 등 법인세 주석 세부 테이블 확장
 * 재무제표 계정과 감사보고서 내용 연결
-* 여러 기업·업종에 걸친 일괄 수집 및 비교 분석
+* 산업별 기업 비교 및 통계 분석
 * 기업 간 비교, 다년도 추세 분석
 * 정정공시 반영 자동화
 
