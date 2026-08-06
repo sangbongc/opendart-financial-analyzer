@@ -232,6 +232,101 @@ def create_financial_ratio_tables(
     )
 
 
+def create_financial_statement_change_tables(
+    connection: sqlite3.Connection,
+) -> None:
+    """
+    재무제표 계정별 당기·전기 금액을 기반으로 계산한
+    증감액과 증감률 결과를 저장하는 테이블 및 인덱스를 생성한다.
+
+    하나의 기업, 사업연도, 보고서, 재무제표 구분,
+    재무제표 종류, 계정별로 한 행씩 저장한다.
+
+    이미 테이블과 인덱스가 존재하면 새로 만들지 않는다.
+    """
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS financial_statement_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            corp_code TEXT NOT NULL,
+            bsns_year TEXT NOT NULL,
+            reprt_code TEXT NOT NULL,
+            fs_div TEXT NOT NULL,
+
+            sj_div TEXT NOT NULL,
+            account_id TEXT NOT NULL DEFAULT '',
+            account_nm TEXT NOT NULL,
+            account_detail TEXT NOT NULL DEFAULT '',
+
+            current_amount INTEGER,
+            previous_amount INTEGER,
+            change_amount INTEGER,
+            change_rate REAL,
+
+            calculation_version TEXT NOT NULL DEFAULT 'v1',
+            calculated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (corp_code)
+                REFERENCES dart_corporations(corp_code),
+
+            UNIQUE (
+                corp_code,
+                bsns_year,
+                reprt_code,
+                fs_div,
+                sj_div,
+                account_id,
+                account_nm,
+                account_detail,
+                calculation_version
+            )
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_statement_changes_corp_year
+        ON financial_statement_changes(
+            corp_code,
+            bsns_year
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_statement_changes_report
+        ON financial_statement_changes(
+            corp_code,
+            bsns_year,
+            reprt_code,
+            fs_div
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_statement_changes_account
+        ON financial_statement_changes(
+            account_id,
+            bsns_year
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_statement_changes_account_name
+        ON financial_statement_changes(
+            account_nm,
+            bsns_year
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_financial_statement_changes_rate
+        ON financial_statement_changes(
+            change_rate
+        );
+        """
+    )
+
+
 def create_tables() -> None:
     """
     프로젝트에서 사용하는 모든 데이터베이스 테이블을 생성한다.
@@ -243,3 +338,4 @@ def create_tables() -> None:
         create_corporations_table(connection)
         create_financial_statement_tables(connection)
         create_financial_ratio_tables(connection)
+        create_financial_statement_change_tables(connection)
