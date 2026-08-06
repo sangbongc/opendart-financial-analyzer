@@ -27,7 +27,7 @@ from console.corporation_selector import(
     select_corporation
 )
 from console.commands.eps_commands import handle_show_eps
-
+from console.commands.prepare_commands import handle_prepare_financial_data
 
 class ConsoleController:
     """
@@ -101,6 +101,9 @@ class ConsoleController:
             elif command == "eps":
                 handle_show_eps()
 
+            elif command == "prepare":
+                handle_prepare_financial_data()
+            
             elif command in {
                 "exit",
                 "quit",
@@ -140,6 +143,7 @@ tax-change            주요 세무관련 계정 증감 계산
 taxnote               법인세비용 주석의 주요 구성항목을 조회
 audit                 감사보고서 조회 및 주요 단락 분석
 eps                   저장된 재무제표에서 기본·희석 EPS 조회
+prepare               fs ratio change를 모두 실행하여 필요한 데이터를 저장한다.
 exit                  프로그램 종료
 """
 )
