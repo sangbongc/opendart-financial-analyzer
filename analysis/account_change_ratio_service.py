@@ -1,10 +1,15 @@
 from __future__ import annotations
+
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from database.financial_statement_change_repository import (
+    upsert_financial_statement_changes,
+)
 from database.financial_statement_repository import (
     fetch_financial_statements_from_db,
 )
+
 
 major_accounts_by_statement = {
     "BS": [
@@ -21,9 +26,17 @@ major_accounts_by_statement = {
     ],
 }
 
+DEFAULT_CHANGE_STATEMENTS = (
+    "BS",
+    "IS",
+    "CIS",
+    "CF",
+)
+
+
 class AccountChangeRatioError(Exception):
     """
-    계정별 증감률 조회 또는 계산 과정에서 발생하는 오류.
+    계정별 증감률 조회, 계산 또는 저장 과정에서 발생하는 오류.
     """
 
 
@@ -56,7 +69,6 @@ def calculate_account_change_ratio(
 
     if previous == 0:
         change_ratio = None
-
     else:
         change_ratio = (
             change_amount
@@ -96,6 +108,7 @@ def calculate_account_change_ratios(
 
         results.append(
             {
+                "financial_statement_id": statement.get("id"),
                 "corp_code": statement.get("corp_code"),
                 "bsns_year": statement.get("bsns_year"),
                 "reprt_code": statement.get("reprt_code"),
@@ -138,30 +151,6 @@ def get_account_change_ratios(
     """
     데이터베이스에 저장된 재무제표를 조회한 뒤
     계정별 증감액과 증감률을 계산한다.
-
-    Args:
-        corp_code:
-            DART 기업 고유번호.
-
-        bsns_year:
-            사업연도.
-
-        reprt_code:
-            보고서 코드.
-            기본값 11011은 사업보고서이다.
-
-        fs_div:
-            CFS는 연결재무제표,
-            OFS는 별도재무제표이다.
-
-        sj_div:
-            BS는 재무상태표,
-            IS는 손익계산서,
-            CIS는 포괄손익계산서,
-            CF는 현금흐름표,
-            SCE는 자본변동표이다.
-
-            None이면 모든 재무제표를 조회한다.
     """
     try:
         financial_statements = fetch_financial_statements_from_db(
@@ -171,7 +160,6 @@ def get_account_change_ratios(
             fs_div=fs_div,
             sj_div=sj_div,
         )
-
     except Exception as error:
         raise AccountChangeRatioError(
             "재무제표 조회 중 오류가 발생했습니다."
@@ -184,6 +172,51 @@ def get_account_change_ratios(
         financial_statements
     )
 
+
+def calculate_and_save_account_change_ratios(
+    corp_code: str,
+    bsns_year: str,
+    reprt_code: str = "11011",
+    fs_div: str = "CFS",
+    sj_divs: tuple[str, ...] = DEFAULT_CHANGE_STATEMENTS,
+    calculation_version: str = "v1",
+) -> list[dict[str, Any]]:
+    """
+    저장된 재무제표를 조회해 지정된 재무제표 종류의
+    계정별 증감액·증감률을 계산하고 일괄 저장한다.
+
+    기본적으로 BS, IS, CIS, CF를 모두 계산·저장한다.
+    """
+    results: list[dict[str, Any]] = []
+
+    for sj_div in sj_divs:
+        statement_results = get_account_change_ratios(
+            corp_code=corp_code,
+            bsns_year=bsns_year,
+            reprt_code=reprt_code,
+            fs_div=fs_div,
+            sj_div=sj_div,
+        )
+
+        results.extend(statement_results)
+
+    if not results:
+        return []
+
+    try:
+        upsert_financial_statement_changes(
+            results=results,
+            calculation_version=calculation_version,
+        )
+
+    except Exception as error:
+        raise AccountChangeRatioError(
+            "계정별 증감 결과 저장 중 오류가 발생했습니다."
+        ) from error
+
+    return results
+
+
 def get_combined_account_change_ratios(
     corp_code: str,
     bsns_year: str,
@@ -192,7 +225,7 @@ def get_combined_account_change_ratios(
     sj_divs: tuple[str, ...] = ("BS", "IS", "CIS"),
 ) -> list[dict[str, Any]]:
     combined_results: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str]] = set()
+    seen_keys: set[tuple[str, str, str]] = set()
 
     for sj_div in sj_divs:
         results = get_account_change_ratios(
@@ -205,6 +238,7 @@ def get_combined_account_change_ratios(
 
         for result in results:
             account_key = (
+                str(result.get("sj_div") or ""),
                 str(result.get("account_id") or ""),
                 str(result.get("account_nm") or ""),
             )
@@ -228,9 +262,11 @@ def get_major_account_change_ratios(
     """
     재무제표 종류별 주요 계정의 증감률을 반환한다.
     """
-    results = []
+    results: list[dict[str, Any]] = []
 
-    for sj_div, major_accounts in major_accounts_by_statement.items():
+    for sj_div, major_accounts in (
+        major_accounts_by_statement.items()
+    ):
         statement_results = get_account_change_ratios(
             corp_code=corp_code,
             bsns_year=bsns_year,
@@ -241,23 +277,29 @@ def get_major_account_change_ratios(
 
         normalized_accounts = {
             _normalize_account_name(account_name): index
-            for index, account_name in enumerate(major_accounts)
+            for index, account_name in enumerate(
+                major_accounts
+            )
         }
 
-        filtered_results = []
+        filtered_results: list[dict[str, Any]] = []
 
         for row in statement_results:
-            account_name = str(row.get("account_nm") or "")
-            normalized_name = _normalize_account_name(account_name)
+            account_name = str(
+                row.get("account_nm") or ""
+            )
+            normalized_name = _normalize_account_name(
+                account_name
+            )
 
             if normalized_name not in normalized_accounts:
                 continue
 
             result = dict(row)
             result["sj_div"] = sj_div
-            result["_major_account_order"] = normalized_accounts[
-                normalized_name
-            ]
+            result["_major_account_order"] = (
+                normalized_accounts[normalized_name]
+            )
             filtered_results.append(result)
 
         filtered_results.sort(
@@ -275,17 +317,8 @@ def get_major_account_change_ratios(
 def _to_decimal(value: Any) -> Decimal | None:
     """
     재무제표 금액을 Decimal로 변환한다.
-
-    다음 값은 None으로 처리한다.
-
-    - None
-    - 빈 문자열
-    - 숫자로 변환할 수 없는 값
     """
-    if value is None:
-        return None
-
-    if isinstance(value, bool):
+    if value is None or isinstance(value, bool):
         return None
 
     if isinstance(value, Decimal):
@@ -308,10 +341,9 @@ def _to_decimal(value: Any) -> Decimal | None:
 
     try:
         return Decimal(normalized_value)
-
     except InvalidOperation:
         return None
-    
+
 
 def _normalize_account_name(
     account_name: str | None,

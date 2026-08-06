@@ -237,10 +237,10 @@ def create_financial_statement_change_tables(
 ) -> None:
     """
     재무제표 계정별 당기·전기 금액을 기반으로 계산한
-    증감액과 증감률 결과를 저장하는 테이블 및 인덱스를 생성한다.
+    증감액과 증감률을 저장하는 테이블 및 인덱스를 생성한다.
 
     하나의 기업, 사업연도, 보고서, 재무제표 구분,
-    재무제표 종류, 계정별로 한 행씩 저장한다.
+    재무제표 종류, 계정, 계산 버전별로 한 행을 저장한다.
 
     이미 테이블과 인덱스가 존재하면 새로 만들지 않는다.
     """
@@ -249,36 +249,33 @@ def create_financial_statement_change_tables(
         CREATE TABLE IF NOT EXISTS financial_statement_changes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+            financial_statement_id INTEGER NOT NULL,
+
             corp_code TEXT NOT NULL,
             bsns_year TEXT NOT NULL,
             reprt_code TEXT NOT NULL,
             fs_div TEXT NOT NULL,
-
             sj_div TEXT NOT NULL,
+
             account_id TEXT NOT NULL DEFAULT '',
             account_nm TEXT NOT NULL,
             account_detail TEXT NOT NULL DEFAULT '',
 
-            current_amount INTEGER,
-            previous_amount INTEGER,
             change_amount INTEGER,
             change_rate REAL,
 
             calculation_version TEXT NOT NULL DEFAULT 'v1',
             calculated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+            FOREIGN KEY (financial_statement_id)
+                REFERENCES financial_statements(id)
+                ON DELETE CASCADE,
+
             FOREIGN KEY (corp_code)
                 REFERENCES dart_corporations(corp_code),
 
             UNIQUE (
-                corp_code,
-                bsns_year,
-                reprt_code,
-                fs_div,
-                sj_div,
-                account_id,
-                account_nm,
-                account_detail,
+                financial_statement_id,
                 calculation_version
             )
         );

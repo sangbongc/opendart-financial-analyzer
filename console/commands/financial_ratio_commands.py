@@ -10,7 +10,7 @@ from analysis.financial_ratio_service import (
 )
 from analysis.account_change_ratio_service import (
     major_accounts_by_statement,
-    get_account_change_ratios,
+    calculate_and_save_account_change_ratios,
     get_combined_account_change_ratios,
     get_major_account_change_ratios,
 )
@@ -146,94 +146,125 @@ def handle_show_financial_ratios() -> None:
     
 
 def handle_account_change_ratios() -> None:
-        """
-        저장된 재무제표를 기반으로 계정별 증감률을 계산하고 출력한다.
-        """
-        print()
-        print("[계정별 증감률 조회]")
-        print("-" * 60)
+    """
+    저장된 재무제표를 기반으로 계정별 증감률을
+    계산·저장하고 출력한다.
 
-        corporation = select_corporation()
+    재무제표 종류를 입력하지 않으면 BS, IS, CIS, CF를
+    모두 계산·저장하고 출력한다.
+    """
+    print()
+    print("[계정별 증감률 계산 및 저장]")
+    print("-" * 60)
 
-        if corporation is None:
-            return
+    corporation = select_corporation()
 
-        bsns_year = input(
-            "사업연도를 입력하세요: "
-        ).strip()
+    if corporation is None:
+        return
 
-        if not bsns_year:
-            print("사업연도를 입력해야 합니다.")
-            return
+    bsns_year = input(
+        "사업연도를 입력하세요: "
+    ).strip()
 
-        reprt_code = "11011"
+    if not bsns_year:
+        print("사업연도를 입력해야 합니다.")
+        return
 
-        fs_div = input(
-            "재무제표 구분을 입력하세요 "
-            "(CFS: 연결, OFS: 별도) [CFS]: "
-        ).strip().upper()
+    reprt_code = "11011"
 
-        if not fs_div:
-            fs_div = "CFS"
+    fs_div = input(
+        "재무제표 구분을 입력하세요 "
+        "(CFS: 연결, OFS: 별도) [CFS]: "
+    ).strip().upper()
 
-        sj_div = input(
-            "재무제표 종류를 입력하세요 "
-            "(BS: 재무상태표, IS: 손익계산서, "
-            "CIS: 포괄손익계산서, CF: 현금흐름표): "
-        ).strip().upper()
+    if not fs_div:
+        fs_div = "CFS"
 
-        if sj_div not in {
+    if fs_div not in {"CFS", "OFS"}:
+        print(
+            "재무제표 구분은 CFS 또는 OFS만 "
+            "입력할 수 있습니다."
+        )
+        return
+
+    sj_div = input(
+        "재무제표 종류를 입력하세요 "
+        "(BS: 재무상태표, IS: 손익계산서, "
+        "CIS: 포괄손익계산서, CF: 현금흐름표) "
+        "[전체]: "
+    ).strip().upper()
+
+    valid_sj_divs = {
+        "BS",
+        "IS",
+        "CIS",
+        "CF",
+    }
+
+    if sj_div and sj_div not in valid_sj_divs:
+        print("올바른 재무제표 종류를 입력하세요.")
+        return
+
+    if sj_div:
+        selected_sj_divs = (sj_div,)
+    else:
+        selected_sj_divs = (
             "BS",
             "IS",
             "CIS",
             "CF",
-        }:
-            print("올바른 재무제표 종류를 입력하세요.")
-            return
-
-        try:
-            results = get_account_change_ratios(
-                corp_code=corporation["corp_code"],
-                bsns_year=bsns_year,
-                reprt_code=reprt_code,
-                fs_div=fs_div,
-                sj_div=sj_div,
-            )
-
-            analysis_results = get_combined_account_change_ratios(
-                corp_code=corporation["corp_code"],
-                bsns_year=bsns_year,
-                reprt_code=reprt_code,
-                fs_div=fs_div,
-            )
-
-        except Exception as error:
-            print(
-                "계정별 증감률 계산 중 "
-                f"오류가 발생했습니다: {error}"
-            )
-            return
-
-        # 사용자가 선택한 재무제표의 증감률 출력
-        print_account_change_ratios(results)
-
-        # 주요 계정의 개별 변동 분석
-        major_analyses = analyze_major_account_changes(
-            analysis_results
         )
 
-        print_major_account_analyses(
-            major_analyses
+    try:
+        results = calculate_and_save_account_change_ratios(
+            corp_code=corporation["corp_code"],
+            bsns_year=bsns_year,
+            reprt_code=reprt_code,
+            fs_div=fs_div,
+            sj_divs=selected_sj_divs,
         )
 
-        # 매출액과 재고자산 증감률 비교
-        inventory_analysis = analyze_inventory_vs_revenue(
-            analysis_results
+    except Exception as error:
+        print(
+            "계정별 증감률 계산 중 "
+            f"오류가 발생했습니다: {error}"
         )
+        return
 
-        print_inventory_vs_revenue_analysis(
-            inventory_analysis
+    if not results:
+        print(
+            "조건에 해당하는 재무제표 "
+            "증감률이 없습니다."
         )
+        return
+
+    analysis_results = [
+        row
+        for row in results
+        if row.get("sj_div") in {
+            "BS",
+            "IS",
+            "CIS",
+        }
+    ]
+
+    print_account_change_ratios(results)
+
+    major_analyses = analyze_major_account_changes(
+        analysis_results
+    )
+
+    print_major_account_analyses(
+        major_analyses
+    )
+
+    inventory_analysis = analyze_inventory_vs_revenue(
+        analysis_results
+    )
+
+    print_inventory_vs_revenue_analysis(
+        inventory_analysis
+    )
 
 
 def handle_major_account_change_ratios() -> None:
