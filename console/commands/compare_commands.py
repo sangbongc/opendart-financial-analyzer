@@ -423,6 +423,9 @@ def _print_comparison_table(
     for summary_name, summary_key in (
         ("평균", "mean"),
         ("중앙값", "median"),
+        ("표준편차", "stdev"),
+        ("최소값", "min"),
+        ("최대값", "max"),
     ):
         values = [
             _format_percentage(

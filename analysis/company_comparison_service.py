@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from statistics import mean, median
+from statistics import (
+    mean, 
+    median,
+    stdev,
+)
 from typing import Any
 
 from database.company_comparison_repository import (
@@ -24,6 +28,7 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "수익(매출액)",
         "영업수익",
         "수익",
+        "매출",
     ),
     "COST_OF_SALES_CHANGE": (
         "매출원가",
@@ -32,14 +37,18 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "영업이익",
         "영업이익(손실)",
         "영업손익",
+        "영업순손익",
     ),
     "RECEIVABLE_CHANGE": (
         "매출채권",
+        "단기매출채권",
         "유동매출채권",
         "매출채권및기타채권",
         "매출채권 및 기타채권",
         "유동매출채권및기타채권",
         "유동매출채권 및 기타채권",
+        "매출채권및기타유동채권",
+        "매출채권 및 기타유동채권",
     ),
     "INVENTORY_CHANGE": (
         "재고자산",
@@ -51,11 +60,15 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "PAYABLE_CHANGE": (
         "매입채무",
+        "단기매입채무",
         "유동매입채무",
         "매입채무및기타채무",
         "매입채무 및 기타채무",
         "유동매입채무및기타채무",
         "유동매입채무 및 기타채무",
+        "매입채무및기타유동채무",
+        "매입채무 및 기타유동채무",
+        
     ),
 }
 
@@ -310,6 +323,13 @@ def _calculate_summary(
             "count": len(values),
             "mean": mean(values) if values else None,
             "median": median(values) if values else None,
+            "stdev": (
+                stdev(values)
+                if len(values) >= 2
+                else None
+            ),
+            "min": min(values) if values else None,
+            "max": max(values) if values else None,
         }
 
     return summary
