@@ -11,6 +11,10 @@ from database.company_comparison_repository import (
     fetch_comparison_account_changes,
     fetch_comparison_financial_ratios,
 )
+from analysis.account_selector import (
+    account_scope_priority,
+    normalize_account_name,
+)
 
 
 BASE_RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -69,6 +73,7 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "영업이익(손실)",
         "영업손익",
         "영업순손익",
+        "영업손실",
     ),
     "RECEIVABLE_CHANGE": (
         "매출채권",
@@ -80,6 +85,8 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "유동매출채권 및 기타채권",
         "매출채권및기타유동채권",
         "매출채권 및 기타유동채권",
+        "매출채권과기타채권",
+        "매출채권 및 기타수취채권",
     ),
     "INVENTORY_CHANGE": (
         "재고자산",
@@ -99,6 +106,8 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "유동매입채무 및 기타채무",
         "매입채무및기타유동채무",
         "매입채무 및 기타유동채무",
+        "매입채무및기타금융부채",
+        "매입채무 및 기타지급채무",
         
     ),
 }
@@ -260,14 +269,14 @@ def _build_comparison_rows(
         )
 
     alias_to_key = {
-        _normalize_account_name(alias): column_key
+        normalize_account_name(alias): column_key
         for column_key, aliases in ACCOUNT_ALIASES.items()
         for alias in aliases
     }
 
     alias_priority = {
         column_key: {
-            _normalize_account_name(alias): index
+            normalize_account_name(alias): index
             for index, alias in enumerate(aliases)
         }
         for column_key, aliases in ACCOUNT_ALIASES.items()
@@ -275,14 +284,14 @@ def _build_comparison_rows(
 
     selected_priority: dict[
         tuple[str, str],
-        tuple[int, int, int],
+        tuple[int, int, int, int],
     ] = {}
 
     for change in change_rows:
         corp_code = _normalize_corp_code(
             change.get("corp_code")
         )
-        normalized_name = _normalize_account_name(
+        normalized_name = normalize_account_name(
             change.get("account_nm")
         )
         column_key = alias_to_key.get(normalized_name)
@@ -293,6 +302,12 @@ def _build_comparison_rows(
         if column_key is None:
             continue
 
+        prefer_current = column_key in {
+            "RECEIVABLE_CHANGE",
+            "INVENTORY_CHANGE",
+            "PAYABLE_CHANGE",
+        }
+
         priority = (
             _statement_priority(
                 column_key=column_key,
@@ -300,6 +315,10 @@ def _build_comparison_rows(
                     change.get("sj_div") or ""
                 ),
             ),
+            account_scope_priority(
+                change,
+                prefer_current=prefer_current,
+            ) if prefer_current else 0,
             alias_priority[column_key].get(
                 normalized_name,
                 999,
@@ -470,14 +489,6 @@ def _normalize_corp_code(
         return ""
 
     return text.zfill(8)
-
-
-def _normalize_account_name(
-    account_name: Any,
-) -> str:
-    return "".join(
-        str(account_name or "").split()
-    )
 
 
 def _to_float(

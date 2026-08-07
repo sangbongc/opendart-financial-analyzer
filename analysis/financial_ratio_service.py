@@ -8,6 +8,10 @@ from database.financial_ratio_repository import (
 from database.financial_statement_repository import (
     fetch_financial_statements_from_db,
 )
+from analysis.account_selector import (
+    account_scope_priority,
+    normalize_account_name,
+)
 
 
 class FinancialRatioCalculationError(Exception):
@@ -31,6 +35,7 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "영업이익(손실)",
         "영업손익",
         "영업순손익",
+        "영업손실",
     ),
     "net_income": (
     "당기순이익",
@@ -43,18 +48,24 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
     "지배주주당기순이익(손실)",
     "지배기업소유주지분순이익",
     "지배기업소유주지분당기순이익",
+    "당기순손실",
+    "당기연결순이익",
+    "당기연결순이익(손실)",
     ),
     "total_assets": (
         "자산총계",
         "자산총액",
+        "총자산",
     ),
     "total_liabilities": (
         "부채총계",
         "부채총액",
+        "총부채",
     ),
     "total_equity": (
         "자본총계",
         "자본총액",
+        "총자본",
     ),
     "current_assets": (
         "유동자산",
@@ -79,6 +90,7 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "매출채권 및 기타유동채권",
         "매출채권및기타채권",
         "매출채권 및 기타채권",
+        "매출채권 및 기타수취채권",
     ),
     "payables": (
         "매입채무",
@@ -90,6 +102,8 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "매입채무 및 기타유동채무",
         "매입채무및기타채무",
         "매입채무 및 기타채무",
+        "매입채무및기타금융부채",
+        "매입채무 및 기타지급채무",
     ),
 }
 
@@ -509,18 +523,6 @@ def calculate_and_save_financial_ratios(
     }
 
 
-def _normalize_account_name(
-    account_name: str | None,
-) -> str:
-    """
-    계정과목 비교를 위해 공백을 제거한다.
-    """
-    if account_name is None:
-        return ""
-
-    return "".join(account_name.split())
-
-
 def _parse_amount(
     value: Any,
 ) -> Decimal | None:
@@ -568,7 +570,7 @@ def _find_account_row(
     statement_divisions: tuple[str, ...] | None = None,
 ) -> dict[str, Any] | None:
     normalized_aliases = [
-        _normalize_account_name(alias)
+        normalize_account_name(alias)
         for alias in aliases
     ]
 
@@ -595,7 +597,7 @@ def _find_account_row(
         ):
             continue
 
-        account_name = _normalize_account_name(
+        account_name = normalize_account_name(
             row.get("account_nm")
         )
 
@@ -611,8 +613,12 @@ def _find_account_row(
                 str(row.get("sj_div")),
                 len(division_priority),
             ),
+            account_scope_priority(
+                row,
+                prefer_current=True,
+            ),
             alias_priority.get(
-                _normalize_account_name(
+                normalize_account_name(
                     row.get("account_nm")
                 ),
                 len(alias_priority),

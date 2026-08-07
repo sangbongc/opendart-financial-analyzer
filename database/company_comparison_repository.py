@@ -104,6 +104,8 @@ def fetch_comparison_account_changes(
     """
     여러 기업의 저장된 계정별 증감률을 한 번에 조회한다.
 
+    계정명 앞의 목차 표기(I., Ⅱ., (1) 등)는 서비스 계층에서
+    정규화하므로 여기서는 account_nm을 exact match로 제한하지 않는다.
     계산 버전을 고정하지 않고, 기업·연도·보고서·재무제표
     구분·재무제표 종류·계정별로 가장 최근 계산 결과
     한 건을 반환한다.
@@ -114,10 +116,6 @@ def fetch_comparison_account_changes(
     corp_placeholders = ", ".join(
         "?" for _ in corp_codes
     )
-    account_placeholders = ", ".join(
-        "?" for _ in account_names
-    )
-
     query = f"""
         WITH ranked_changes AS (
             SELECT
@@ -152,7 +150,6 @@ def fetch_comparison_account_changes(
               AND s.bsns_year = ?
               AND s.reprt_code = ?
               AND s.fs_div = ?
-              AND s.account_nm IN ({account_placeholders})
         )
         SELECT
             corp_code,
@@ -178,7 +175,6 @@ def fetch_comparison_account_changes(
         bsns_year,
         reprt_code,
         fs_div,
-        *account_names,
     ]
 
     with database_connection() as connection:
