@@ -324,6 +324,72 @@ def create_financial_statement_change_tables(
     )
 
 
+def create_industry_group_tables(
+    connection: sqlite3.Connection,
+) -> None:
+    """
+    산업군과 산업군별 기업 목록을 저장하는
+    테이블 및 인덱스를 생성한다.
+
+    이미 테이블과 인덱스가 존재하면 새로 만들지 않는다.
+    """
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS industry_groups (
+            industry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            industry_code TEXT NOT NULL UNIQUE,
+            industry_name TEXT NOT NULL UNIQUE,
+            description TEXT,
+
+            created_at TEXT NOT NULL
+                DEFAULT CURRENT_TIMESTAMP
+        );
+
+
+        CREATE TABLE IF NOT EXISTS
+            industry_group_members (
+                industry_id INTEGER NOT NULL,
+                corp_code TEXT NOT NULL,
+
+                created_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    industry_id,
+                    corp_code
+                ),
+
+                FOREIGN KEY (industry_id)
+                    REFERENCES industry_groups(
+                        industry_id
+                    )
+                    ON DELETE CASCADE,
+
+                FOREIGN KEY (corp_code)
+                    REFERENCES dart_corporations(
+                        corp_code
+                    )
+                    ON DELETE CASCADE
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_industry_group_members_industry
+        ON industry_group_members(
+            industry_id
+        );
+
+
+        CREATE INDEX IF NOT EXISTS
+            idx_industry_group_members_corp
+        ON industry_group_members(
+            corp_code
+        );
+        """
+    )
+
+
 def create_tables() -> None:
     """
     프로젝트에서 사용하는 모든 데이터베이스 테이블을 생성한다.
@@ -336,3 +402,4 @@ def create_tables() -> None:
         create_financial_statement_tables(connection)
         create_financial_ratio_tables(connection)
         create_financial_statement_change_tables(connection)
+        create_industry_group_tables(connection)
