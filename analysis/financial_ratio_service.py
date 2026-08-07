@@ -62,6 +62,35 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
     "current_liabilities": (
         "유동부채",
     ),
+    "cost_of_sales": (
+        "매출원가",
+    ),
+    "inventory": (
+        "재고자산",
+        "유동재고자산",
+    ),
+    "receivables": (
+        "매출채권",
+        "단기매출채권",
+        "유동매출채권",
+        "유동매출채권및기타채권",
+        "유동매출채권 및 기타채권",
+        "매출채권및기타유동채권",
+        "매출채권 및 기타유동채권",
+        "매출채권및기타채권",
+        "매출채권 및 기타채권",
+    ),
+    "payables": (
+        "매입채무",
+        "단기매입채무",
+        "유동매입채무",
+        "유동매입채무및기타채무",
+        "유동매입채무 및 기타채무",
+        "매입채무및기타유동채무",
+        "매입채무 및 기타유동채무",
+        "매입채무및기타채무",
+        "매입채무 및 기타채무",
+    ),
 }
 
 
@@ -149,6 +178,30 @@ def calculate_financial_ratios(
         statement_divisions=("BS",),
     )
 
+    cost_of_sales, _ = _extract_account_amounts(
+        statements=statement_rows,
+        account_key="cost_of_sales",
+        statement_divisions=("IS", "CIS"),
+    )
+
+    current_inventory, previous_inventory = _extract_account_amounts(
+        statements=statement_rows,
+        account_key="inventory",
+        statement_divisions=("BS",),
+    )
+
+    current_receivables, previous_receivables = _extract_account_amounts(
+        statements=statement_rows,
+        account_key="receivables",
+        statement_divisions=("BS",),
+    )
+
+    current_payables, previous_payables = _extract_account_amounts(
+        statements=statement_rows,
+        account_key="payables",
+        statement_divisions=("BS",),
+    )
+
     average_assets = _calculate_average(
         current_value=current_assets_total,
         previous_value=previous_assets_total,
@@ -157,6 +210,43 @@ def calculate_financial_ratios(
     average_equity = _calculate_average(
         current_value=current_equity_total,
         previous_value=previous_equity_total,
+    )
+
+    average_inventory = _calculate_average(
+        current_value=current_inventory,
+        previous_value=previous_inventory,
+    )
+    average_receivables = _calculate_average(
+        current_value=current_receivables,
+        previous_value=previous_receivables,
+    )
+    average_payables = _calculate_average(
+        current_value=current_payables,
+        previous_value=previous_payables,
+    )
+
+    inventory_turnover = _calculate_turnover(
+        numerator=cost_of_sales,
+        average_balance=average_inventory,
+    )
+    dio = _calculate_days_from_turnover(inventory_turnover)
+
+    receivables_turnover = _calculate_turnover(
+        numerator=revenue,
+        average_balance=average_receivables,
+    )
+    dso = _calculate_days_from_turnover(receivables_turnover)
+
+    payables_turnover = _calculate_turnover(
+        numerator=cost_of_sales,
+        average_balance=average_payables,
+    )
+    dpo = _calculate_days_from_turnover(payables_turnover)
+
+    ccc = _calculate_cash_conversion_cycle(
+        dio=dio,
+        dso=dso,
+        dpo=dpo,
     )
 
     ratios = [
@@ -272,6 +362,90 @@ def calculate_financial_ratios(
             "denominator_value": _to_storage_number(
                 current_liabilities
             ),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "INVENTORY_TURNOVER",
+            "ratio_name": "재고자산회전율",
+            "ratio_value": inventory_turnover,
+            "numerator_value": _to_storage_number(cost_of_sales),
+            "denominator_value": _to_storage_number(average_inventory),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "DIO",
+            "ratio_name": "재고보유기간",
+            "ratio_value": dio,
+            "numerator_value": _to_storage_number(average_inventory),
+            "denominator_value": _to_storage_number(cost_of_sales),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "RECEIVABLE_TURNOVER",
+            "ratio_name": "매출채권회전율",
+            "ratio_value": receivables_turnover,
+            "numerator_value": _to_storage_number(revenue),
+            "denominator_value": _to_storage_number(average_receivables),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "DSO",
+            "ratio_name": "매출채권회수기간",
+            "ratio_value": dso,
+            "numerator_value": _to_storage_number(average_receivables),
+            "denominator_value": _to_storage_number(revenue),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "PAYABLE_TURNOVER",
+            "ratio_name": "매입채무회전율",
+            "ratio_value": payables_turnover,
+            "numerator_value": _to_storage_number(cost_of_sales),
+            "denominator_value": _to_storage_number(average_payables),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "DPO",
+            "ratio_name": "매입채무지급기간",
+            "ratio_value": dpo,
+            "numerator_value": _to_storage_number(average_payables),
+            "denominator_value": _to_storage_number(cost_of_sales),
+            "calculation_version": calculation_version,
+        },
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "CCC",
+            "ratio_name": "현금전환주기",
+            "ratio_value": ccc,
+            "numerator_value": None,
+            "denominator_value": None,
             "calculation_version": calculation_version,
         },
     ]
@@ -505,6 +679,41 @@ def _calculate_percentage(
     result = numerator / denominator * Decimal("100")
 
     return float(result)
+
+
+def _calculate_turnover(
+    numerator: Decimal | None,
+    average_balance: Decimal | None,
+) -> float | None:
+    if numerator is None or average_balance is None:
+        return None
+
+    if average_balance == 0:
+        return None
+
+    return float(numerator / average_balance)
+
+
+def _calculate_days_from_turnover(
+    turnover: float | None,
+) -> float | None:
+    if turnover is None or turnover == 0:
+        return None
+
+    return float(
+        Decimal("365") / Decimal(str(turnover))
+    )
+
+
+def _calculate_cash_conversion_cycle(
+    dio: float | None,
+    dso: float | None,
+    dpo: float | None,
+) -> float | None:
+    if dio is None or dso is None or dpo is None:
+        return None
+
+    return dio + dso - dpo
 
 
 def _calculate_average(

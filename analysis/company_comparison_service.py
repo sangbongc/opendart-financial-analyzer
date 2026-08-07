@@ -13,7 +13,7 @@ from database.company_comparison_repository import (
 )
 
 
-RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
+BASE_RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
     ("OPERATING_MARGIN", "영업이익률"),
     ("NET_PROFIT_MARGIN", "순이익률"),
     ("ROA", "ROA"),
@@ -21,6 +21,37 @@ RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
     ("DEBT_RATIO", "부채비율"),
     ("CURRENT_RATIO", "유동비율"),
 )
+
+WORKING_CAPITAL_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("INVENTORY_TURNOVER", "재고회전율"),
+    ("DIO", "재고보유일수"),
+    ("RECEIVABLE_TURNOVER", "채권회전율"),
+    ("DSO", "채권회수일수"),
+    ("PAYABLE_TURNOVER", "채무회전율"),
+    ("DPO", "채무지급일수"),
+    ("CCC", "현금전환주기"),
+)
+
+RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
+    *BASE_RATIO_COLUMNS,
+    *WORKING_CAPITAL_COLUMNS,
+)
+
+RATIO_FORMATS: dict[str, str] = {
+    "OPERATING_MARGIN": "percentage",
+    "NET_PROFIT_MARGIN": "percentage",
+    "ROA": "percentage",
+    "ROE": "percentage",
+    "DEBT_RATIO": "percentage",
+    "CURRENT_RATIO": "percentage",
+    "INVENTORY_TURNOVER": "turnover",
+    "DIO": "days",
+    "RECEIVABLE_TURNOVER": "turnover",
+    "DSO": "days",
+    "PAYABLE_TURNOVER": "turnover",
+    "DPO": "days",
+    "CCC": "days",
+}
 
 ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
     "REVENUE_CHANGE": (

@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from analysis.company_comparison_service import (
+    BASE_RATIO_COLUMNS,
     CHANGE_COLUMNS,
-    RATIO_COLUMNS,
+    RATIO_FORMATS,
+    WORKING_CAPITAL_COLUMNS,
     CompanyComparisonError,
     compare_corporation_financial_data,
 )
@@ -86,7 +88,14 @@ def _print_comparison_result(
         title="재무비율 비교",
         rows=rows,
         summary=summary,
-        columns=RATIO_COLUMNS,
+        columns=BASE_RATIO_COLUMNS,
+    )
+
+    _print_comparison_table(
+        title="운전자본 효율성 비교",
+        rows=rows,
+        summary=summary,
+        columns=WORKING_CAPITAL_COLUMNS,
     )
 
     _print_comparison_table(
@@ -372,6 +381,27 @@ def _format_percentage(
     return f"{float(value):+.2f}%"
 
 
+def _format_comparison_value(
+    column_code: str,
+    value: Any,
+) -> str:
+    if value is None:
+        return "-"
+
+    format_type = RATIO_FORMATS.get(
+        column_code,
+        "percentage",
+    )
+
+    if format_type == "turnover":
+        return f"{float(value):.2f}회"
+
+    if format_type == "days":
+        return f"{float(value):.2f}일"
+
+    return _format_percentage(value)
+
+
 def _print_comparison_table(
     title: str,
     rows: list[dict[str, Any]],
@@ -404,8 +434,9 @@ def _print_comparison_table(
         )
 
         values = [
-            _format_percentage(
-                row.get(column_code)
+            _format_comparison_value(
+                column_code=column_code,
+                value=row.get(column_code),
             )
             for column_code, _ in columns
         ]
@@ -428,8 +459,9 @@ def _print_comparison_table(
         ("최대값", "max"),
     ):
         values = [
-            _format_percentage(
-                summary[column_code][summary_key]
+            _format_comparison_value(
+                column_code=column_code,
+                value=summary[column_code][summary_key],
             )
             for column_code, _ in columns
         ]

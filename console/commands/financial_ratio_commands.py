@@ -39,6 +39,36 @@ from utils import (
 )
 
 
+TURNOVER_RATIO_CODES = {
+    "INVENTORY_TURNOVER",
+    "RECEIVABLE_TURNOVER",
+    "PAYABLE_TURNOVER",
+}
+
+DAY_RATIO_CODES = {
+    "DIO",
+    "DSO",
+    "DPO",
+    "CCC",
+}
+
+
+def _format_financial_ratio_value(
+    ratio_code: str,
+    value: object,
+) -> str:
+    if value is None:
+        return "-"
+
+    if ratio_code in TURNOVER_RATIO_CODES:
+        return f"{float(value):.2f}회"
+
+    if ratio_code in DAY_RATIO_CODES:
+        return f"{float(value):.2f}일"
+
+    return format_ratio(value)
+
+
 def handle_calculate_financial_ratios() -> None:
         """
         기업과 재무제표 조건을 입력받아
@@ -86,7 +116,10 @@ def handle_calculate_financial_ratios() -> None:
         for ratio in result["ratios"]:
             print(
                 f"{ratio['ratio_name']}: "
-                f"{format_ratio(ratio['ratio_value'])}"
+                f"{_format_financial_ratio_value(
+                    ratio['ratio_code'],
+                    ratio['ratio_value'],
+                )}"
             )
 
         print("-" * 60)
@@ -138,7 +171,10 @@ def handle_show_financial_ratios() -> None:
         for ratio in ratios:
             print(
                 f"{ratio['ratio_name']}: "
-                f"{format_ratio(ratio['ratio_value'])}"
+                f"{_format_financial_ratio_value(
+                    ratio['ratio_code'],
+                    ratio['ratio_value'],
+                )}"
             )
 
         print("-" * 60)
