@@ -31,6 +31,10 @@ from console.commands.prepare_commands import handle_prepare_financial_data
 from console.commands.batch_prepare_commands import (
     handle_batch_prepare_financial_data,
 )
+from console.commands.compare_commands import (
+    handle_compare_corporations,
+)
+
 
 class ConsoleController:
     """
@@ -109,6 +113,9 @@ class ConsoleController:
 
             elif command == "batch-prepare":
                 handle_batch_prepare_financial_data()
+
+            elif command == "compare":
+                handle_compare_corporations()
             
             elif command in {
                 "exit",
@@ -151,6 +158,7 @@ audit                 감사보고서 조회 및 주요 단락 분석
 eps                   저장된 재무제표에서 기본·희석 EPS 조회
 prepare               fs ratio change를 모두 실행하여 필요한 데이터를 저장
 batch-prepare         여러 기업의 재무 데이터 일괄 준비
+compare               여러 기업의 재무비율·증감률 비교
 exit                  프로그램 종료
 """
 )
