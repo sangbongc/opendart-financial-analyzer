@@ -25,6 +25,14 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
         "영업수익",
         "수익",
     ),
+    "COST_OF_SALES_CHANGE": (
+        "매출원가",
+    ),
+    "OPERATING_PROFIT_CHANGE": (
+        "영업이익",
+        "영업이익(손실)",
+        "영업손익",
+    ),
     "RECEIVABLE_CHANGE": (
         "매출채권",
         "유동매출채권",
@@ -53,10 +61,18 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
 
 CHANGE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("REVENUE_CHANGE", "매출증감률"),
-    ("RECEIVABLE_CHANGE", "매출채권증감률"),
+    ("COST_OF_SALES_CHANGE", "매출원가증감률"),
+    (
+        "OPERATING_PROFIT_CHANGE",
+        "영업이익증감률",
+    ),
+    (
+        "RECEIVABLE_CHANGE",
+        "매출채권증감률",
+    ),
     ("INVENTORY_CHANGE", "재고증감률"),
-    ("PPE_CHANGE", "유형자산증감률"),
     ("PAYABLE_CHANGE", "매입채무증감률"),
+    ("PPE_CHANGE", "유형자산증감률"),
 )
 
 DISPLAY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -364,15 +380,32 @@ def _statement_priority(
     column_key: str,
     sj_div: str,
 ) -> int:
-    if column_key == "REVENUE_CHANGE":
+    income_statement_columns = {
+        "REVENUE_CHANGE",
+        "COST_OF_SALES_CHANGE",
+        "OPERATING_PROFIT_CHANGE",
+    }
+
+    balance_sheet_columns = {
+        "RECEIVABLE_CHANGE",
+        "INVENTORY_CHANGE",
+        "PPE_CHANGE",
+        "PAYABLE_CHANGE",
+    }
+
+    if column_key in income_statement_columns:
         priorities = {
             "IS": 0,
             "CIS": 1,
         }
-    else:
+
+    elif column_key in balance_sheet_columns:
         priorities = {
             "BS": 0,
         }
+
+    else:
+        priorities = {}
 
     return priorities.get(sj_div, 99)
 

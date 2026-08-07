@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from analysis.company_comparison_service import (
+    CHANGE_COLUMNS,
+    RATIO_COLUMNS,
     CompanyComparisonError,
     compare_corporation_financial_data,
 )
@@ -11,6 +13,11 @@ from console.commands.corporation_commands import (
 )
 from dart.corporation_service import (
     find_corporations_with_count,
+)
+from database.industry_repository import (
+    IndustryRepositoryError,
+    fetch_corporations_by_industry,
+    fetch_industry_groups,
 )
 from utils import pad, truncate_text
 
@@ -29,10 +36,10 @@ def handle_compare_corporations() -> None:
     print("-" * 60)
 
     conditions = input_financial_statement_conditions()
-    corporations = _input_corporations_until_stop()
+    corporations = _select_comparison_corporations()
 
     if not corporations:
-        print("선택된 기업이 없어 작업을 종료합니다.")
+        print("비교할 기업이 없어 작업을 종료합니다.")
         return
 
     sort_key, descending = _input_sort_condition()
@@ -67,23 +74,6 @@ def _print_comparison_result(
     rows = result["rows"]
     summary = result["summary"]
 
-    ratio_columns = (
-        ("OPERATING_MARGIN", "영업이익률"),
-        ("NET_PROFIT_MARGIN", "순이익률"),
-        ("ROA", "ROA"),
-        ("ROE", "ROE"),
-        ("DEBT_RATIO", "부채비율"),
-        ("CURRENT_RATIO", "유동비율"),
-    )
-
-    change_columns = (
-        ("REVENUE_CHANGE", "매출증감률"),
-        ("RECEIVABLE_CHANGE", "매출채권증감률"),
-        ("INVENTORY_CHANGE", "재고증감률"),
-        ("PPE_CHANGE", "유형자산증감률"),
-        ("PAYABLE_CHANGE", "매입채무증감률"),
-    )
-
     print()
     print("[비교 조건]")
     print("-" * 60)
@@ -96,14 +86,14 @@ def _print_comparison_result(
         title="재무비율 비교",
         rows=rows,
         summary=summary,
-        columns=ratio_columns,
+        columns=RATIO_COLUMNS,
     )
 
     _print_comparison_table(
         title="계정 증감률 비교",
         rows=rows,
         summary=summary,
-        columns=change_columns,
+        columns=CHANGE_COLUMNS,
     )
 
     if result["missing_corporations"]:
@@ -114,6 +104,116 @@ def _print_comparison_result(
                 result["missing_corporations"]
             )
         )
+
+
+def _select_comparison_corporations(
+) -> list[dict[str, Any]]:
+    """
+    기업 직접 선택 또는 저장된 산업군 선택 방식으로
+    비교 대상 기업 목록을 구성한다.
+    """
+    print()
+    print("[비교 대상 선택]")
+    print("-" * 60)
+    print("1. 기업 직접 선택")
+    print("2. 저장된 산업군 선택")
+
+    selection = input(
+        "선택하세요 [1]: "
+    ).strip()
+
+    if selection in {"", "1"}:
+        return _input_corporations_until_stop()
+
+    if selection == "2":
+        return _select_corporations_by_industry()
+
+    print("목록에 있는 번호를 입력하세요.")
+    return []
+
+
+def _select_corporations_by_industry(
+) -> list[dict[str, Any]]:
+    """
+    저장된 산업군을 선택하고 해당 산업군의 기업 목록을
+    비교 대상으로 반환한다.
+    """
+    try:
+        groups = fetch_industry_groups()
+
+    except IndustryRepositoryError as error:
+        print(f"산업군 목록 조회 실패: {error}")
+        return []
+
+    if not groups:
+        print("저장된 산업군이 없습니다.")
+        return []
+
+    print()
+    print("[산업군 선택]")
+    print("-" * 80)
+
+    for index, group in enumerate(
+        groups,
+        start=1,
+    ):
+        print(
+            f"{index}. {group['industry_name']} "
+            f"[{group['industry_code']}] "
+            f"({group['member_count']:,}개 기업)"
+        )
+
+    selection = input(
+        "비교할 산업군 번호를 입력하세요 "
+        "(취소: Enter): "
+    ).strip()
+
+    if not selection:
+        return []
+
+    try:
+        selected_index = int(selection) - 1
+
+    except ValueError:
+        print("숫자로 입력해야 합니다.")
+        return []
+
+    if not 0 <= selected_index < len(groups):
+        print("목록에 있는 번호를 입력하세요.")
+        return []
+
+    selected_group = groups[selected_index]
+
+    try:
+        corporations = fetch_corporations_by_industry(
+            industry_id=selected_group["industry_id"]
+        )
+
+    except IndustryRepositoryError as error:
+        print(f"산업군 기업 목록 조회 실패: {error}")
+        return []
+
+    if not corporations:
+        print(
+            f"{selected_group['industry_name']} 산업군에 "
+            "등록된 기업이 없습니다."
+        )
+        return []
+
+    print()
+    print(
+        f"선택 산업군: "
+        f"{selected_group['industry_name']} "
+        f"({len(corporations):,}개 기업)"
+    )
+
+    for corporation in corporations:
+        print(
+            f"- {corporation['corp_name']} "
+            f"({corporation['corp_code']})"
+        )
+
+    return corporations
 
 
 def _input_sort_condition() -> tuple[str, bool]:
