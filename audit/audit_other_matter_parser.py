@@ -61,6 +61,14 @@ SECTION_BOUNDARY_PATTERNS = (
     re.compile(
         r"내부회계관리제도\s*감사\s*또는\s*검토"
     ),
+    re.compile(
+    r"(?:연결\s*)?내부회계관리제도에\s*대한\s*"
+    r"경영진과\s*지배기구의\s*책임"
+    ),
+    re.compile(
+    r"(?:연결\s*)?내부회계관리제도\s*감사에\s*대한\s*"
+    r"감사인의\s*책임"
+    ),
 )
 
 
