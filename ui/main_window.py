@@ -24,6 +24,9 @@ from ui.tabs.financial_ratio_tab import (
 from ui.tabs.account_change_tab import (
     AccountChangeTab,
 )
+from ui.tabs.company_comparison_tab import (
+    CompanyComparisonTab,
+)
 
 
 class MainWindow(QMainWindow):
@@ -87,6 +90,7 @@ class MainWindow(QMainWindow):
         # 결과 탭
         self.tabs = QTabWidget()
 
+        # 재무제표 탭
         self.financial_statement_tab = (
             FinancialStatementTab()
         )
@@ -96,6 +100,7 @@ class MainWindow(QMainWindow):
             "재무제표",
         )
 
+        # 재무비율 탭
         self.financial_ratio_tab = (
             FinancialRatioTab()
         )
@@ -105,6 +110,7 @@ class MainWindow(QMainWindow):
             "재무비율",
         )
 
+        # 계정 증감분석 탭
         self.account_change_tab = (
             AccountChangeTab()
         )
@@ -112,6 +118,16 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(
             self.account_change_tab,
             "계정 증감분석",
+        )
+
+        # 기업 비교 탭
+        self.company_comparison_tab = (
+            CompanyComparisonTab()
+        )
+
+        self.tabs.addTab(
+            self.company_comparison_tab,
+            "기업 비교",
         )
 
         main_layout.addWidget(
@@ -122,6 +138,9 @@ class MainWindow(QMainWindow):
             central_widget
         )
 
+        # 프로그램 최초 실행 시에도
+        # 현재 조회조건을 모든 탭에 전달한다.
+        self._update_tab_context()
 
     def _on_corporation_selected(
         self,
@@ -171,6 +190,10 @@ class MainWindow(QMainWindow):
 
         self.account_change_tab.set_context(
             corporation=self.selected_corporation,
+            conditions=conditions,
+        )
+
+        self.company_comparison_tab.set_context(
             conditions=conditions,
         )
 
