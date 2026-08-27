@@ -18,6 +18,12 @@ from ui.widgets.query_conditions import (
 from ui.tabs.financial_statement_tab import (
     FinancialStatementTab,
 )
+from ui.tabs.financial_ratio_tab import (
+    FinancialRatioTab,
+)
+from ui.tabs.account_change_tab import (
+    AccountChangeTab,
+)
 
 
 class MainWindow(QMainWindow):
@@ -69,7 +75,7 @@ class MainWindow(QMainWindow):
         self.query_conditions = (
             QueryConditionsWidget()
         )
-        
+
         self.query_conditions.conditions_changed.connect(
             self._update_tab_context
         )
@@ -90,6 +96,24 @@ class MainWindow(QMainWindow):
             "재무제표",
         )
 
+        self.financial_ratio_tab = (
+            FinancialRatioTab()
+        )
+
+        self.tabs.addTab(
+            self.financial_ratio_tab,
+            "재무비율",
+        )
+
+        self.account_change_tab = (
+            AccountChangeTab()
+        )
+
+        self.tabs.addTab(
+            self.account_change_tab,
+            "계정 증감분석",
+        )
+
         main_layout.addWidget(
             self.tabs
         )
@@ -97,6 +121,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(
             central_widget
         )
+
 
     def _on_corporation_selected(
         self,
@@ -135,6 +160,16 @@ class MainWindow(QMainWindow):
         )
 
         self.financial_statement_tab.set_context(
+            corporation=self.selected_corporation,
+            conditions=conditions,
+        )
+
+        self.financial_ratio_tab.set_context(
+            corporation=self.selected_corporation,
+            conditions=conditions,
+        )
+
+        self.account_change_tab.set_context(
             corporation=self.selected_corporation,
             conditions=conditions,
         )

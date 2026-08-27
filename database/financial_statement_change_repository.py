@@ -80,6 +80,88 @@ def upsert_financial_statement_changes(
         ) from error
 
 
+def fetch_financial_statement_changes(
+    corp_code: str,
+    bsns_year: str,
+    reprt_code: str,
+    fs_div: str,
+    sj_div: str | None = None,
+    calculation_version: str = DEFAULT_CALCULATION_VERSION,
+) -> list[dict[str, Any]]:
+    """
+    저장된 계정별 증감 결과를 조회한다.
+
+    재무제표 종류를 전달하면 해당 재무제표만 조회하고,
+    전달하지 않으면 모든 재무제표 종류를 조회한다.
+    """
+    query = """
+        SELECT
+            fsc.id,
+            fsc.financial_statement_id,
+            fsc.corp_code,
+            fsc.bsns_year,
+            fsc.reprt_code,
+            fsc.fs_div,
+            fsc.sj_div,
+            fsc.account_id,
+            fsc.account_nm,
+            fsc.account_detail,
+            fs.thstrm_amount AS current_amount,
+            fs.frmtrm_amount AS previous_amount,
+            fsc.change_amount,
+            fsc.change_rate,
+            fsc.calculation_version,
+            fsc.calculated_at,
+            fs.ord
+        FROM financial_statement_changes AS fsc
+        JOIN financial_statements AS fs
+          ON fs.id = fsc.financial_statement_id
+        WHERE fsc.corp_code = ?
+          AND fsc.bsns_year = ?
+          AND fsc.reprt_code = ?
+          AND fsc.fs_div = ?
+          AND fsc.calculation_version = ?
+    """
+
+    parameters: list[object] = [
+        corp_code,
+        bsns_year,
+        reprt_code,
+        fs_div,
+        calculation_version,
+    ]
+
+    if sj_div is not None:
+        query += """
+          AND fsc.sj_div = ?
+        """
+        parameters.append(sj_div)
+
+    query += """
+        ORDER BY
+            fsc.sj_div,
+            fs.ord,
+            fs.id
+    """
+
+    try:
+        with database_connection() as connection:
+            cursor = connection.execute(
+                query,
+                parameters,
+            )
+
+            return [
+                dict(row)
+                for row in cursor.fetchall()
+            ]
+
+    except Exception as error:
+        raise FinancialStatementChangeRepositoryError(
+            "재무제표 증감 결과 조회 중 오류가 발생했습니다."
+        ) from error
+
+
 def _build_insert_row(
     result: dict[str, Any],
     calculation_version: str,
