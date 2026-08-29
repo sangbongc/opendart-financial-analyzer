@@ -18,6 +18,7 @@ from analysis.account_selector import (
 
 
 BASE_RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("GROSS_PROFIT_MARGIN", "매출총이익률"),
     ("OPERATING_MARGIN", "영업이익률"),
     ("NET_PROFIT_MARGIN", "순이익률"),
     ("ROA", "ROA"),
@@ -42,6 +43,7 @@ RATIO_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 
 RATIO_FORMATS: dict[str, str] = {
+    "GROSS_PROFIT_MARGIN": "percentage",
     "OPERATING_MARGIN": "percentage",
     "NET_PROFIT_MARGIN": "percentage",
     "ROA": "percentage",

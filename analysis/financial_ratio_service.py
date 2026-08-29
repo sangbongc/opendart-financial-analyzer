@@ -121,6 +121,7 @@ def calculate_financial_ratios(
 
     계산 비율
     ----------
+    - 매출총이익률
     - 영업이익률
     - 순이익률
     - ROA
@@ -198,6 +199,11 @@ def calculate_financial_ratios(
         statement_divisions=("IS", "CIS"),
     )
 
+    gross_profit = _calculate_difference(
+        minuend=revenue,
+        subtrahend=cost_of_sales,
+    )
+
     current_inventory, previous_inventory = _extract_account_amounts(
         statements=statement_rows,
         account_key="inventory",
@@ -264,6 +270,25 @@ def calculate_financial_ratios(
     )
 
     ratios = [
+        {
+            "corp_code": corp_code,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+            "fs_div": fs_div,
+            "ratio_code": "GROSS_PROFIT_MARGIN",
+            "ratio_name": "매출총이익률",
+            "ratio_value": _calculate_percentage(
+                numerator=gross_profit,
+                denominator=revenue,
+            ),
+            "numerator_value": _to_storage_number(
+                gross_profit
+            ),
+            "denominator_value": _to_storage_number(
+                revenue
+            ),
+            "calculation_version": calculation_version,
+        },
         {
             "corp_code": corp_code,
             "bsns_year": bsns_year,
@@ -685,6 +710,21 @@ def _calculate_percentage(
     result = numerator / denominator * Decimal("100")
 
     return float(result)
+
+
+def _calculate_difference(
+    minuend: Decimal | None,
+    subtrahend: Decimal | None,
+) -> Decimal | None:
+    """
+    두 금액의 차이를 계산한다.
+
+    어느 한쪽이라도 없으면 None을 반환한다.
+    """
+    if minuend is None or subtrahend is None:
+        return None
+
+    return minuend - subtrahend
 
 
 def _calculate_turnover(

@@ -88,6 +88,11 @@ def analyze_company_time_series(
         change_rows=change_rows,
     )
 
+    missing_ratio_years = _find_missing_ratio_years(
+        years=years,
+        ratio_rows=ratio_rows,
+    )
+
     missing_years = [
         row["bsns_year"]
         for row in rows
@@ -114,7 +119,57 @@ def analyze_company_time_series(
         "rows": rows,
         "year_count": len(rows),
         "missing_years": missing_years,
+        "missing_ratio_years": missing_ratio_years,
     }
+
+
+def _find_missing_ratio_years(
+    years: list[str],
+    ratio_rows: list[dict[str, Any]],
+) -> list[str]:
+    """
+    현재 정의된 재무비율 중 아직 계산 결과 행이
+    저장되지 않은 사업연도를 찾는다.
+
+    ratio_value가 None이어도 ratio_code 행이 존재하면
+    이미 계산을 시도한 것으로 보고 누락으로 판단하지 않는다.
+    """
+    required_ratio_codes = {
+        ratio_code
+        for ratio_code, _ in RATIO_COLUMNS
+    }
+
+    stored_ratio_codes_by_year: dict[str, set[str]] = {
+        year: set()
+        for year in years
+    }
+
+    for ratio in ratio_rows:
+        year = str(
+            ratio.get("bsns_year") or ""
+        ).strip()
+
+        if year not in stored_ratio_codes_by_year:
+            continue
+
+        ratio_code = str(
+            ratio.get("ratio_code") or ""
+        ).strip()
+
+        if not ratio_code:
+            continue
+
+        stored_ratio_codes_by_year[year].add(
+            ratio_code
+        )
+
+    return [
+        year
+        for year in years
+        if not required_ratio_codes.issubset(
+            stored_ratio_codes_by_year[year]
+        )
+    ]
 
 
 def _build_time_series_rows(

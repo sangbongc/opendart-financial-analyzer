@@ -749,7 +749,19 @@ class CompanyTimeSeriesTab(QWidget):
             [],
         )
 
-        if not missing_years:
+        missing_ratio_years = current_result.get(
+            "missing_ratio_years",
+            [],
+        )
+
+        prepare_years = sorted(
+            set(
+                missing_years
+                + missing_ratio_years
+            )
+        )
+
+        if not prepare_years:
             QMessageBox.information(
                 self,
                 "자료 확인",
@@ -780,8 +792,8 @@ class CompanyTimeSeriesTab(QWidget):
             "누락 자료 준비",
             (
                 f"{corp_name}의 다음 사업연도 자료가 "
-                "비어 있습니다.\n\n"
-                f"{', '.join(missing_years)}\n\n"
+                "없거나 현재 정의된 재무비율이 일부 누락되어 있습니다.\n\n"
+                f"{', '.join(prepare_years)}\n\n"
                 "DART에서 재무제표를 수집하고 "
                 "재무비율 및 계정 증감률을 계산하시겠습니까?"
             ),
@@ -817,7 +829,7 @@ class CompanyTimeSeriesTab(QWidget):
         )
 
         try:
-            for year in missing_years:
+            for year in prepare_years:
                 try:
                     prepare_financial_data(
                         corp_code=corp_code,
