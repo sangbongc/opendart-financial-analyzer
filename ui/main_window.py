@@ -27,6 +27,9 @@ from ui.tabs.account_change_tab import (
 from ui.tabs.company_comparison_tab import (
     CompanyComparisonTab,
 )
+from ui.tabs.company_time_series_tab import (
+    CompanyTimeSeriesTab,
+)
 
 
 class MainWindow(QMainWindow):
@@ -90,7 +93,7 @@ class MainWindow(QMainWindow):
         # 결과 탭
         self.tabs = QTabWidget()
 
-        # 재무제표 탭
+        # 재무제표
         self.financial_statement_tab = (
             FinancialStatementTab()
         )
@@ -100,7 +103,7 @@ class MainWindow(QMainWindow):
             "재무제표",
         )
 
-        # 재무비율 탭
+        # 재무비율
         self.financial_ratio_tab = (
             FinancialRatioTab()
         )
@@ -110,7 +113,7 @@ class MainWindow(QMainWindow):
             "재무비율",
         )
 
-        # 계정 증감분석 탭
+        # 계정 증감분석
         self.account_change_tab = (
             AccountChangeTab()
         )
@@ -120,7 +123,7 @@ class MainWindow(QMainWindow):
             "계정 증감분석",
         )
 
-        # 기업 비교 탭
+        # 기업 비교
         self.company_comparison_tab = (
             CompanyComparisonTab()
         )
@@ -128,6 +131,16 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(
             self.company_comparison_tab,
             "기업 비교",
+        )
+
+        # 기업 시계열
+        self.company_time_series_tab = (
+            CompanyTimeSeriesTab()
+        )
+
+        self.tabs.addTab(
+            self.company_time_series_tab,
+            "기업 시계열",
         )
 
         main_layout.addWidget(
@@ -138,8 +151,7 @@ class MainWindow(QMainWindow):
             central_widget
         )
 
-        # 프로그램 최초 실행 시에도
-        # 현재 조회조건을 모든 탭에 전달한다.
+        # 초기 조회조건을 모든 탭에 전달
         self._update_tab_context()
 
     def _on_corporation_selected(
@@ -194,6 +206,11 @@ class MainWindow(QMainWindow):
         )
 
         self.company_comparison_tab.set_context(
+            conditions=conditions,
+        )
+
+        self.company_time_series_tab.set_context(
+            corporation=self.selected_corporation,
             conditions=conditions,
         )
 
