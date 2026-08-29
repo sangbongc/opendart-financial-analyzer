@@ -244,3 +244,64 @@ def delete_financial_ratios(
 
         return cursor.rowcount
 
+
+def fetch_financial_ratios_by_year_range(
+    corp_code: str,
+    start_year: str,
+    end_year: str,
+    reprt_code: str,
+    fs_div: str,
+    calculation_version: str | None = None,
+) -> list[dict]:
+    """
+    한 기업의 여러 사업연도 재무비율을 조회한다.
+    """
+    query = """
+        SELECT
+            id,
+            corp_code,
+            bsns_year,
+            reprt_code,
+            fs_div,
+            ratio_code,
+            ratio_name,
+            ratio_value,
+            numerator_value,
+            denominator_value,
+            calculation_version,
+            calculated_at
+        FROM financial_ratio_results
+        WHERE corp_code = ?
+          AND bsns_year BETWEEN ? AND ?
+          AND reprt_code = ?
+          AND fs_div = ?
+    """
+
+    parameters: list[object] = [
+        corp_code,
+        start_year,
+        end_year,
+        reprt_code,
+        fs_div,
+    ]
+
+    if calculation_version is not None:
+        query += " AND calculation_version = ?"
+        parameters.append(calculation_version)
+
+    query += """
+        ORDER BY
+            bsns_year,
+            ratio_code
+    """
+
+    with database_connection() as connection:
+        cursor = connection.execute(
+            query,
+            parameters,
+        )
+
+        return [
+            dict(row)
+            for row in cursor.fetchall()
+        ]

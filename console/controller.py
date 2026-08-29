@@ -34,6 +34,9 @@ from console.commands.batch_prepare_commands import (
 from console.commands.compare_commands import (
     handle_compare_corporations,
 )
+from console.commands.time_series_commands import (
+    handle_company_time_series,
+)
 from console.commands.industry_commands import (
     handle_industry_management,
 )
@@ -120,6 +123,9 @@ class ConsoleController:
             elif command == "compare":
                 handle_compare_corporations()
 
+            elif command == "times":
+                handle_company_time_series()
+
             elif command == "industry":
                 handle_industry_management()
             
@@ -165,6 +171,7 @@ eps                   저장된 재무제표에서 기본·희석 EPS 조회
 prepare               fs ratio change를 모두 실행하여 필요한 데이터를 저장
 batch-prepare         여러 기업의 재무 데이터 일괄 준비
 compare               여러 기업의 재무비율·증감률 비교
+times                 한 기업의 연도별 재무비율·증감률 시계열 분석
 industry              산업군 생성 및 기업 목록 관리
 exit                  프로그램 종료
 """

@@ -162,6 +162,79 @@ def fetch_financial_statement_changes(
         ) from error
 
 
+def fetch_financial_statement_changes_by_year_range(
+    corp_code: str,
+    start_year: str,
+    end_year: str,
+    reprt_code: str,
+    fs_div: str,
+    calculation_version: str = DEFAULT_CALCULATION_VERSION,
+) -> list[dict[str, Any]]:
+    """
+    한 기업의 여러 사업연도 계정별 증감 결과를 조회한다.
+    """
+    query = """
+        SELECT
+            fsc.id,
+            fsc.financial_statement_id,
+            fsc.corp_code,
+            fsc.bsns_year,
+            fsc.reprt_code,
+            fsc.fs_div,
+            fsc.sj_div,
+            fsc.account_id,
+            fsc.account_nm,
+            fsc.account_detail,
+            fs.thstrm_amount AS current_amount,
+            fs.frmtrm_amount AS previous_amount,
+            fsc.change_amount,
+            fsc.change_rate,
+            fsc.calculation_version,
+            fsc.calculated_at,
+            fs.ord
+        FROM financial_statement_changes AS fsc
+        JOIN financial_statements AS fs
+          ON fs.id = fsc.financial_statement_id
+        WHERE fsc.corp_code = ?
+          AND fsc.bsns_year BETWEEN ? AND ?
+          AND fsc.reprt_code = ?
+          AND fsc.fs_div = ?
+          AND fsc.calculation_version = ?
+        ORDER BY
+            fsc.bsns_year,
+            fsc.sj_div,
+            fs.ord,
+            fs.id
+    """
+
+    parameters = [
+        corp_code,
+        start_year,
+        end_year,
+        reprt_code,
+        fs_div,
+        calculation_version,
+    ]
+
+    try:
+        with database_connection() as connection:
+            cursor = connection.execute(
+                query,
+                parameters,
+            )
+
+            return [
+                dict(row)
+                for row in cursor.fetchall()
+            ]
+
+    except Exception as error:
+        raise FinancialStatementChangeRepositoryError(
+            "재무제표 시계열 증감 결과 조회 중 "
+            "오류가 발생했습니다."
+        ) from error
+    
+
 def _build_insert_row(
     result: dict[str, Any],
     calculation_version: str,
